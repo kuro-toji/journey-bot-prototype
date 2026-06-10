@@ -208,6 +208,7 @@ const handlers = {
   faq_fd_comparison:                 makeFaqHandler('fd_comparison'),
   faq_how_to_book:                   handleHowToBook,
   faq_what_is_kyc:                   makeFaqHandler('what_is_kyc'),
+  faq_aadhaar_ekyc:                  makeFaqHandler('aadhaar_ekyc'),
   faq_why_vkyc:                      makeFaqHandler('why_vkyc'),
   faq_rd_definition:                 makeFaqHandler('rd_definition'),
 
@@ -219,7 +220,15 @@ const handlers = {
 };
 
 function dispatch(intent, req) {
-  const fn = handlers[intent];
+  let fn = handlers[intent];
+  if (!fn && typeof intent === 'string' && intent.startsWith('faq_')) {
+    // Safety net: any faq_* intent that exists in the FAQ module
+    // is auto-handled. Avoids the 'I do not know that one yet'
+    // failure mode when a new FAQ entry is added but the handler
+    // map in this file is forgotten.
+    const faqKey = intent.slice(4);
+    if (FAQ[faqKey]) fn = makeFaqHandler(faqKey);
+  }
   if (!fn) return { type: 'error', text: 'I do not know that one yet.', followUps: followUpsToChips(['faq_fd_definition']) };
   const identity = resolveIdentity(req);
   return fn(identity, (req.body && req.body.params) || {});

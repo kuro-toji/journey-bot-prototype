@@ -166,6 +166,29 @@ const FAQ = {
       "On this demo platform, all KYC steps are auto-approved so you can see the full flow.",
     followUps: ['faq_why_vkyc', 'faq_aadhaar_ekyc', 'how_to_book'],
   },
+  aadhaar_ekyc: {
+    id: 'aadhaar_ekyc',
+    intent: 'faq_aadhaar_ekyc',
+    audience: 'all',
+    label: 'What is Aadhaar eKYC?',
+    answer:
+      "Aadhaar eKYC is the fastest KYC method permitted by RBI. The flow is:\n\n" +
+      "1. You give the bank consent to fetch your Aadhaar data\n" +
+      "2. You enter your 12-digit Aadhaar number\n" +
+      "3. UIDAI sends a one-time passcode to your Aadhaar-linked mobile\n" +
+      "4. You enter the OTP; UIDAI returns your name, address, DOB, photo\n" +
+      "5. The bank matches it against your PAN and opens the account\n\n" +
+      "Pros:\n" +
+      "  - 100% paperless, no branch visit\n" +
+      "  - Account opened in under 5 minutes\n" +
+      "  - Free of cost\n\n" +
+      "Cons:\n" +
+      "  - Only works if your mobile is linked to Aadhaar\n" +
+      "  - Cap of Rs 50,000 per FD for non-video KYC by some banks\n" +
+      "  - Doesn't work if Aadhaar is locked or biometrics are disabled\n\n" +
+      "For deposits above the threshold, banks will fall back to VKYC or in-person KYC.",
+    followUps: ['faq_why_vkyc', 'faq_what_is_kyc', 'how_to_book'],
+  },
   why_vkyc: {
     id: 'why_vkyc',
     intent: 'faq_why_vkyc',
