@@ -30,7 +30,7 @@ async function loadRates() {
 }
 
 function bookFd(rateId) {
-  window.location.href = `/book.html?rateId=${rateId}`;
+  window.location.href = `/pan.html?rateId=${rateId}`;
 }
 
 document.addEventListener('DOMContentLoaded', loadRates);

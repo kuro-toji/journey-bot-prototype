@@ -25,6 +25,7 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/rates', require('./src/routes/rates'));
 app.use('/api/journey', require('./src/routes/journey'));
+app.use('/api/kyc', require('./src/routes/kyc'));
 
 // Static frontend (served from /)
 const FRONTEND_DIR = path.resolve(__dirname, '..', 'frontend');
