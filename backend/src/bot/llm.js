@@ -145,8 +145,16 @@ async function chatCompletion(opts) {
       return { __error: true, status: 401, reason: 'auth_failed' };
     }
     if (res.status === 429) {
-      logCall({ userId, ip, iter: i, status: 429, reason: 'upstream_rate_limited', usage: null, latencyMs: 0 });
-      return { __error: true, status: 503, reason: 'upstream_rate_limited' };
+      // MiniMax returns two distinct 429s:
+      //   - rate_limit_error     (RPM/TPM cap, retryable)
+      //   - usage_limit_error    (account quota, not retryable in-window)
+      // We inspect the body to pick the right reason.
+      const errType = res.body && res.body.error && res.body.error.type;
+      const reason = errType === 'usage_limit_error'
+        ? 'upstream_quota_exceeded'
+        : 'upstream_rate_limited';
+      logCall({ userId, ip, iter: i, status: 429, reason, usage: null, latencyMs: 0 });
+      return { __error: true, status: 503, reason };
     }
     if (res.status < 200 || res.status >= 300) {
       logCall({ userId, ip, iter: i, status: res.status, reason: 'upstream_error', usage: null, latencyMs: 0 });
