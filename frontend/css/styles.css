@@ -8,15 +8,34 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Mobile-first layout */
+/* Base layout */
 .container {
-  max-width: 480px; /* Mobile width */
+  max-width: 1024px;
   margin: 0 auto;
   min-height: 100vh;
   background-color: #ffffff;
   box-shadow: 0 0 10px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
+}
+
+/* Forms & Narrow content */
+form, #vkycInit, #stepInitiate, #stepVerify, .narrow-content {
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Desktop Grid for Lists */
+@media (min-width: 768px) {
+  #ratesList, #portfolioList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  .card {
+    margin-bottom: 0;
+  }
 }
 
 /* Headers */
