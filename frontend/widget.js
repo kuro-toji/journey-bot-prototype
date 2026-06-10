@@ -117,6 +117,25 @@
 .fb-chip[data-intent="undefined"],
 .fb-chip[data-intent=""] { display: none; }
 
+.fb-msg-typing-label {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 12px !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  font-style: italic !important;
+  max-width: 100% !important;
+}
+.fb-msg-meta {
+  background: transparent !important;
+  border: none !important;
+  padding: 2px 12px !important;
+  color: #9ca3af !important;
+  font-size: 11px !important;
+  font-style: italic !important;
+  max-width: 100% !important;
+}
+
 .fb-typing { display: inline-flex; gap: 3px; padding: 4px 0; }
 .fb-typing span {
   width: 6px; height: 6px; border-radius: 50%; background: #9ca3af;
@@ -286,8 +305,12 @@
     document.body.appendChild(root);
   }
 
-  function appendMessage(role, text, isError) {
-    const wrap = el('div', { class: 'fb-msg ' + (isError ? 'fb-msg-error' : (role === 'user' ? 'fb-msg-user' : 'fb-msg-bot')) }, [text || '']);
+  function appendMessage(role, text, isError, extraClass) {
+    const cls = 'fb-msg '
+              + (isError ? 'fb-msg-error '
+                : (role === 'user' ? 'fb-msg-user ' : 'fb-msg-bot '))
+              + (extraClass || '');
+    const wrap = el('div', { class: cls.trim() }, [text || '']);
     if (role === 'user') {
       const w = el('div', { class: 'fb-msg-user-wrap' }, [wrap]);
       bodyEl.appendChild(w);
@@ -370,7 +393,17 @@
     if (intent === 'main_menu') {
       // sentinel — re-render the full menu in place
       appendMessage('user', label || 'Main menu');
+      exitFreeForm();
       await refreshMenu({ replace: true });
+      chips.forEach(c => c.disabled = false);
+      return;
+    }
+
+    if (intent === 'talk_to_assistant') {
+      // intercept before /api/bot/ask — the backend has no handler
+      // for this sentinel. Enter free-form Q&A mode.
+      appendMessage('user', label || 'Talk to assistant');
+      enterFreeForm();
       chips.forEach(c => c.disabled = false);
       return;
     }
@@ -480,6 +513,116 @@
     const fn = state.awaiting;
     state.awaiting = null;
     await fn();
+  }
+
+  /* ---------- free-form Q&A mode (LLM) ----------
+   *
+   * The user clicks the 'Talk to assistant' chip. The widget:
+   *   1) shows a welcome message from the assistant
+   *   2) opens the existing input row in persistent mode
+   *      (callback = submitLlmQuestion)
+   *   3) on each submit, calls POST /api/bot/llm and renders
+   *      the reply (already think-tag-stripped server-side)
+   *   4) keeps the input open so the user can keep chatting
+   *   5) shows '← Main menu' + 'Ask another' chips so the user
+   *      can either continue or exit
+   *
+   * The 'thinking' period is the API round-trip. The existing
+   * typing indicator (3 bouncing dots) covers it; the server has
+   * already stripped <think>...</think> from the response, so
+   * the user never sees internal reasoning.
+   */
+  function enterFreeForm() {
+    state.freeForm = true;
+    setHint('AI mode — ask about FDs or rates. The model will not entertain off-topic questions.');
+    setInputVisible(true, 'Ask about FDs, rates, or comparison…', submitLlmQuestion);
+    appendMessage('bot',
+      "Hi, I'm FinBot's AI assistant. I can help with Fixed Deposits, " +
+      'FD comparison, and related banking topics. Ask me anything.');
+  }
+
+  function exitFreeForm() {
+    state.freeForm = false;
+    setHint('');
+    setInputVisible(false);
+  }
+
+  async function submitLlmQuestion() {
+    if (state.busy) return;
+    const text = (inputEl.value || '').trim();
+    if (!text) return;
+    // Re-assert the persistent input so the user can keep typing
+    // after this submission (setInputVisible clears the value).
+    setInputVisible(true, 'Ask about FDs, rates, or comparison…', submitLlmQuestion);
+    appendMessage('user', text);
+    state.busy = true;
+    const typing = appendTyping();
+    const typingLabel = appendTypingLabel('Assistant is thinking…');
+    let r;
+    try {
+      r = await callBot('/api/bot/llm', { message: text });
+    } catch (e) {
+      r = { __error: true, reason: 'network' };
+    }
+    typing.remove();
+    typingLabel.remove();
+    state.busy = false;
+
+    if (r && r.__error) {
+      const msg = llmErrorToText(r.data && r.data.reason || r.reason);
+      appendMessage('bot', msg, true);
+      appendChips([
+        { intent: 'main_menu', label: '← Main menu' },
+        { intent: 'talk_to_assistant', label: 'Try again' },
+      ]);
+      return;
+    }
+
+    appendMessage('bot', r.text || '(no reply)');
+    // Append usage footer if present
+    if (r.usage && r.usage.total_tokens) {
+      const toolsBit = (r.toolsUsed && r.toolsUsed.length)
+        ? ` · used ${r.toolsUsed.join(', ')}`
+        : '';
+      const remainingBit = (r.remaining != null)
+        ? ` · ${r.remaining} of ${r.limit} messages left this hour`
+        : '';
+      appendMessage('bot',
+        `_(tokens: ${r.usage.total_tokens}${toolsBit}${remainingBit})_`,
+        false, 'fb-msg-meta'
+      );
+    }
+    appendChips([
+      { intent: 'main_menu', label: '← Main menu' },
+    ]);
+  }
+
+  function llmErrorToText(reason) {
+    switch (reason) {
+      case 'missing_api_key':
+        return 'The AI assistant is not configured on this server (MINIMAX_API_KEY missing in backend/.env). Please contact the admin.';
+      case 'auth_failed':
+        return 'The AI assistant is not configured correctly (auth failed). Please contact the admin.';
+      case 'upstream_quota_exceeded':
+        return 'The AI assistant has hit its usage quota. Please try again later or use the FAQ bot.';
+      case 'upstream_rate_limited':
+        return 'The AI assistant is busy. Please try again in a few seconds.';
+      case 'upstream_timeout':
+        return 'The AI took too long. Try a shorter question.';
+      case 'rate_limited':
+        return "You've used all your AI questions for this hour. Try the FAQ bot or come back later.";
+      case 'message_too_long':
+        return 'Your question is too long. Please keep it under 500 characters.';
+      default:
+        return 'The AI assistant is having trouble. Please try again, or use the FAQ bot.';
+    }
+  }
+
+  function appendTypingLabel(text) {
+    const t = el('div', { class: 'fb-msg fb-msg-bot fb-msg-typing-label' }, [text]);
+    bodyEl.appendChild(t);
+    bodyEl.scrollTop = bodyEl.scrollHeight;
+    return t;
   }
 
   /* ---------- open / close ---------- */
