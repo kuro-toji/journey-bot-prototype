@@ -224,12 +224,13 @@ const FAQ = {
  * resolver stay in sync.
  */
 const PERSONAL_INTENTS = {
-  check_my_fds:   'Check my FDs',
-  my_active_fds:  'Show my active FDs',
-  my_total_value: "What's my total FD value?",
-  my_maturity:    'When do my FDs mature?',
-  my_biggest_fd:  'Show my biggest FD',
-  verify_start:   'Verify identity',
+  check_my_fds:       'Check my FDs',
+  my_active_fds:      'Show my active FDs',
+  my_total_value:     "What's my total FD value?",
+  my_maturity:        'When do my FDs mature?',
+  my_biggest_fd:      'Show my biggest FD',
+  verify_start:       'Verify identity',
+  talk_to_assistant:  'Talk to assistant',
 };
 
 /**
@@ -261,6 +262,13 @@ function getMenu(audience) {
       items.push({ intent, label: PERSONAL_INTENTS[intent] });
     }
   }
+  // 'Talk to assistant' is offered to BOTH audiences. For anon
+  // users it sits alongside the verify trigger at the bottom of
+  // the menu; for authed users it sits above the personalized
+  // actions. The widget intercepts this intent client-side and
+  // enters free-form Q&A mode (it never hits /api/bot/ask).
+  const taIdx = items.length; // insert just before [Main menu] if any
+  items.splice(taIdx, 0, { intent: 'talk_to_assistant', label: PERSONAL_INTENTS.talk_to_assistant });
   return items;
 }
 
