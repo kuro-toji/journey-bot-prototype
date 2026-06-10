@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Env
+.env
+.env.local
+
+# Runtime data
+data/phones.json
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database & docs (per user request — do not commit)
+PLAN.md
+db/
