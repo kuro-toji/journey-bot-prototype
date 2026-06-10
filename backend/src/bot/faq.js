@@ -196,6 +196,20 @@ const FAQ = {
 };
 
 /**
+ * Personalized / synthetic intents that are NOT FAQ entries. Their
+ * labels live here so the menu builder and the follow-up chip
+ * resolver stay in sync.
+ */
+const PERSONAL_INTENTS = {
+  check_my_fds:   'Check my FDs',
+  my_active_fds:  'Show my active FDs',
+  my_total_value: "What's my total FD value?",
+  my_maturity:    'When do my FDs mature?',
+  my_biggest_fd:  'Show my biggest FD',
+  verify_start:   'Verify identity',
+};
+
+/**
  * Look up a FAQ by intent id.
  */
 function getFaq(intent) {
@@ -205,36 +219,26 @@ function getFaq(intent) {
 /**
  * Build the menu of clickable chips for a given role.
  *
- * @param {'all'|'auth'} audience - which menu section to build
- *   - 'all'  : every chip (anonymous gets this whole menu; "my" chips are
- *              shown as triggers for the verification flow)
- *   - 'auth' : only the personalized "my FDs" chips
+ *   audience = 'all'  -> every FAQ chip + 'Check my FDs' trigger
+ *                          (anon: triggers the verify flow)
+ *   audience = 'auth' -> 'How do I book an FD?' chip + the four
+ *                          personalized 'my FDs' actions
  */
 function getMenu(audience) {
   const items = [];
-  for (const key of Object.keys(FAQ)) {
-    const f = FAQ[key];
-    if (audience === 'auth' && f.audience !== 'auth' && f.id !== 'check_my_fds' && f.id !== 'my_active_fds' && f.id !== 'my_total_value' && f.id !== 'my_maturity' && f.id !== 'my_biggest_fd' && f.id !== 'how_to_book') {
-      // for auth-only menu, surface only the personalized actions
-      if (f.id !== 'check_my_fds' && f.id !== 'my_active_fds' && f.id !== 'my_total_value' && f.id !== 'my_maturity' && f.id !== 'my_biggest_fd' && f.id !== 'how_to_book') continue;
-    }
-    if (audience === 'all' && (f.id === 'my_active_fds' || f.id === 'my_total_value' || f.id === 'my_maturity' || f.id === 'my_biggest_fd')) {
-      continue; // skip auth-only items in the all menu
-    }
-    items.push({ intent: f.intent, label: f.label });
-  }
-  // Also surface the "my FDs" actions for both audiences (they trigger verify or use JWT)
   if (audience === 'all') {
+    for (const key of Object.keys(FAQ)) {
+      items.push({ intent: FAQ[key].intent, label: FAQ[key].label });
+    }
     items.push({ intent: 'check_my_fds', label: 'Check my FDs (verify identity)' });
   } else {
-    items.push(
-      { intent: 'my_active_fds', label: 'Show my active FDs' },
-      { intent: 'my_total_value', label: "What's my total FD value?" },
-      { intent: 'my_maturity', label: 'When do my FDs mature?' },
-      { intent: 'my_biggest_fd', label: 'Show my biggest FD' }
-    );
+    // authed: keep the booking FAQ + the personalized actions
+    items.push({ intent: FAQ.how_to_book.intent, label: FAQ.how_to_book.label });
+    for (const intent of ['my_active_fds', 'my_total_value', 'my_maturity', 'my_biggest_fd']) {
+      items.push({ intent, label: PERSONAL_INTENTS[intent] });
+    }
   }
   return items;
 }
 
-module.exports = { FAQ, getFaq, getMenu };
+module.exports = { FAQ, getFaq, getMenu, PERSONAL_INTENTS };

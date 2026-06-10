@@ -114,6 +114,8 @@
 }
 .fb-chip:hover { background: #ecad4f; }
 .fb-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.fb-chip[data-intent="undefined"],
+.fb-chip[data-intent=""] { display: none; }
 
 .fb-typing { display: inline-flex; gap: 3px; padding: 4px 0; }
 .fb-typing span {
@@ -189,7 +191,18 @@
     awaiting: null,          // current verification step
     flowChips: null,         // chips shown after the last bot reply
     busy: false,
+    labelMap: Object.create(null), // intent -> label, populated as we learn about intents
   };
+
+  function prettyLabel(intent) {
+    if (!intent) return '';
+    if (state.labelMap[intent]) return state.labelMap[intent];
+    return intent.replace(/^faq_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function rememberChip(c) {
+    if (c && c.intent && c.label) state.labelMap[c.intent] = c.label;
+  }
 
   function getAuthToken() {
     return localStorage.getItem('auth_token') || localStorage.getItem('token') || null;
@@ -289,10 +302,15 @@
     if (!chips || !chips.length) return;
     const wrap = el('div', { class: 'fb-chips' });
     for (const c of chips) {
-      const b = el('button', { class: 'fb-chip', 'data-intent': c.intent }, [c.label]);
-      b.addEventListener('click', () => handleIntentClick(c.intent, c.label));
+      const intent = (c && c.intent) || (typeof c === 'string' ? c : null);
+      if (!intent) continue; // skip malformed entries rather than render empty buttons
+      const label = (c && c.label) || prettyLabel(intent);
+      rememberChip({ intent, label });
+      const b = el('button', { class: 'fb-chip', 'data-intent': intent }, [label]);
+      b.addEventListener('click', () => handleIntentClick(intent, label));
       wrap.appendChild(b);
     }
+    if (!wrap.childElementCount) return;
     bodyEl.appendChild(wrap);
     bodyEl.scrollTop = bodyEl.scrollHeight;
   }
@@ -331,7 +349,7 @@
   async function refreshMenu() {
     const r = await callBot('/api/bot/menu');
     if (r && r.menu && r.menu.length) {
-      // the menu is offered as the initial chips
+      for (const c of r.menu) rememberChip(c); // seed label map for echo + follow-ups
       appendChips(r.menu);
       state.flowChips = r.menu;
     }
@@ -339,17 +357,20 @@
 
   async function handleIntentClick(intent, label) {
     if (state.busy) return;
+    if (label) rememberChip({ intent, label });
     // disable all chips to prevent double-click
     const chips = shadow.querySelectorAll('.fb-chip');
     chips.forEach(c => c.disabled = true);
 
     if (intent === 'verify_start') {
-      appendMessage('user', 'Check my FDs');
+      appendMessage('user', label || 'Check my FDs');
       startVerifyFlow();
+      // re-enable remaining chips (we removed the verify_start one from flow)
+      chips.forEach(c => { if (c.getAttribute('data-intent') !== 'verify_start') c.disabled = false; });
       return;
     }
 
-    appendMessage('user', label || intent);
+    appendMessage('user', label || prettyLabel(intent));
     state.busy = true;
     const typing = appendTyping();
     const r = await callBot('/api/bot/ask', { intent });

@@ -12,9 +12,31 @@
  *   }
  */
 
-const { getFaq, getMenu } = require('./faq');
+const { FAQ, getFaq, getMenu, PERSONAL_INTENTS } = require('./faq');
 const { getCache } = require('./cache');
 const { getTokenUserId } = require('./verify');
+
+/**
+ * Resolve a list of follow-up intents into the {intent, label} shape
+ * the widget expects. Accepts either bare intent strings (e.g. legacy
+ * callers, internal flows) or pre-built {intent, label} objects (e.g.
+ * the menu builder). Falls back to a sensible label derived from the
+ * intent so the chip is never empty.
+ */
+function followUpsToChips(followUps) {
+  if (!Array.isArray(followUps)) return [];
+  return followUps.map(f => {
+    if (f && typeof f === 'object' && f.intent) return f;
+    if (typeof f !== 'string') return null;
+    // FAQ keys are 'fd_definition' while intents are 'faq_fd_definition'
+    const faqKey = f.startsWith('faq_') ? f.slice(4) : f;
+    const faq = FAQ[faqKey];
+    if (faq) return { intent: f, label: faq.label };
+    if (PERSONAL_INTENTS[f]) return { intent: f, label: PERSONAL_INTENTS[f] };
+    // last-ditch fallback so a chip is never empty
+    return { intent: f, label: f.replace(/^faq_/, '').replace(/_/g, ' ') };
+  }).filter(Boolean);
+}
 
 /* ---------- helpers ---------- */
 
@@ -79,8 +101,8 @@ function resolveIdentity(req) {
 function makeFaqHandler(intentId) {
   return () => {
     const f = getFaq(intentId);
-    if (!f) return { type: 'error', text: 'Unknown question.', followUps: ['faq_fd_definition'] };
-    return { type: 'faq', text: f.answer, followUps: f.followUps };
+    if (!f) return { type: 'error', text: 'Unknown question.', followUps: followUpsToChips(['faq_fd_definition']) };
+    return { type: 'faq', text: f.answer, followUps: followUpsToChips(f.followUps) };
   };
 }
 
@@ -88,9 +110,9 @@ function serveMyFds(identity) {
   const cached = identity.userId ? getCache(identity.userId) : null;
   const bookings = cached && cached.bookings ? cached.bookings : null;
   if (!bookings) {
-    return { type: 'data', text: 'I could not find your bookings right now. Please try again.', followUps: ['check_my_fds'] };
+    return { type: 'data', text: 'I could not find your bookings right now. Please try again.', followUps: followUpsToChips(['check_my_fds']) };
   }
-  return { type: 'data', text: renderBookingsList(bookings), followUps: ['my_total_value', 'my_maturity', 'my_biggest_fd', 'check_my_fds'] };
+  return { type: 'data', text: renderBookingsList(bookings), followUps: followUpsToChips(['my_total_value', 'my_maturity', 'my_biggest_fd', 'check_my_fds']) };
 }
 
 function handleCheckMyFds(identity) {
@@ -102,7 +124,7 @@ function handleCheckMyFds(identity) {
             "1. Mobile number: 10 digits, no spaces (e.g. 9714503400)\n" +
             "2. Date of birth: YYYY-MM-DD (e.g. 1990-01-15)\n" +
             "3. PAN: AAAAA9999A (e.g. ABCDE1234F)",
-      followUps: ['verify_start'],
+      followUps: [{ intent: 'verify_start', label: 'Verify identity' }],
     };
   }
   return serveMyFds(identity);
@@ -110,14 +132,14 @@ function handleCheckMyFds(identity) {
 
 function handleMyActiveFds(identity) {
   if (identity.kind === 'anon') {
-    return { type: 'flow', text: 'Please verify your identity first.', followUps: ['check_my_fds'] };
+    return { type: 'flow', text: 'Please verify your identity first.', followUps: followUpsToChips(['check_my_fds']) };
   }
   return serveMyFds(identity);
 }
 
 function handleMyTotalValue(identity) {
   if (identity.kind === 'anon') {
-    return { type: 'flow', text: 'Please verify your identity first.', followUps: ['check_my_fds'] };
+    return { type: 'flow', text: 'Please verify your identity first.', followUps: followUpsToChips(['check_my_fds']) };
   }
   const cached = getCache(identity.userId);
   const bookings = cached && cached.bookings ? cached.bookings : null;
@@ -134,39 +156,39 @@ function handleMyTotalValue(identity) {
       lines.push(`  - ${k}: ${v.count} FD, ${formatRupee(v.principal)}`);
     }
   }
-  return { type: 'data', text: lines.join('\n'), followUps: ['my_active_fds', 'my_maturity', 'my_biggest_fd', 'check_my_fds'] };
+  return { type: 'data', text: lines.join('\n'), followUps: followUpsToChips(['my_active_fds', 'my_maturity', 'my_biggest_fd', 'check_my_fds']) };
 }
 
 function handleMyMaturity(identity) {
   if (identity.kind === 'anon') {
-    return { type: 'flow', text: 'Please verify your identity first.', followUps: ['check_my_fds'] };
+    return { type: 'flow', text: 'Please verify your identity first.', followUps: followUpsToChips(['check_my_fds']) };
   }
   const cached = getCache(identity.userId);
   const bookings = cached && cached.bookings ? cached.bookings : null;
   if (!bookings) return { type: 'error', text: 'Bookings not loaded.' };
   const s = computeSummary(bookings);
-  if (!s.next) return { type: 'data', text: 'You have no active FDs maturing in the future.', followUps: ['my_active_fds', 'check_my_fds'] };
+  if (!s.next) return { type: 'data', text: 'You have no active FDs maturing in the future.', followUps: followUpsToChips(['my_active_fds', 'check_my_fds']) };
   return {
     type: 'data',
     text: `Your next maturity:\n  - ${s.next.bank} on ${formatDate(s.next.date)} → ${formatRupee(s.next.amount)}\n    Ref: ${s.next.ref}`,
-    followUps: ['my_active_fds', 'my_total_value', 'my_biggest_fd', 'check_my_fds'],
+    followUps: followUpsToChips(['my_active_fds', 'my_total_value', 'my_biggest_fd', 'check_my_fds']),
   };
 }
 
 function handleMyBiggestFd(identity) {
   if (identity.kind === 'anon') {
-    return { type: 'flow', text: 'Please verify your identity first.', followUps: ['check_my_fds'] };
+    return { type: 'flow', text: 'Please verify your identity first.', followUps: followUpsToChips(['check_my_fds']) };
   }
   const cached = getCache(identity.userId);
   const bookings = cached && cached.bookings ? cached.bookings : null;
   if (!bookings) return { type: 'error', text: 'Bookings not loaded.' };
   const active = bookings.filter(b => b.state === 'fd_active');
-  if (!active.length) return { type: 'data', text: 'No active FDs.', followUps: ['my_active_fds', 'check_my_fds'] };
+  if (!active.length) return { type: 'data', text: 'No active FDs.', followUps: followUpsToChips(['my_active_fds', 'check_my_fds']) };
   const biggest = active.slice().sort((a, b) => Number(b.principal) - Number(a.principal))[0];
   return {
     type: 'data',
     text: `Your biggest active FD:\n  ${biggest.bank_name} — ${formatRupee(biggest.principal)} @ ${(biggest.interest_rate_bps / 100).toFixed(2)}%\n  Ref: ${biggest.bank_reference_id}\n  Matures: ${formatDate(biggest.maturity_date)} → ${formatRupee(biggest.maturity_amount)}`,
-    followUps: ['my_active_fds', 'my_total_value', 'my_maturity', 'check_my_fds'],
+    followUps: followUpsToChips(['my_active_fds', 'my_total_value', 'my_maturity', 'check_my_fds']),
   };
 }
 
@@ -198,7 +220,7 @@ const handlers = {
 
 function dispatch(intent, req) {
   const fn = handlers[intent];
-  if (!fn) return { type: 'error', text: 'I do not know that one yet.', followUps: ['faq_fd_definition'] };
+  if (!fn) return { type: 'error', text: 'I do not know that one yet.', followUps: followUpsToChips(['faq_fd_definition']) };
   const identity = resolveIdentity(req);
   return fn(identity, (req.body && req.body.params) || {});
 }
@@ -207,4 +229,4 @@ function menuForViewer(isAuthed) {
   return getMenu(isAuthed ? 'auth' : 'all');
 }
 
-module.exports = { dispatch, menuForViewer, computeSummary, renderBookingsList };
+module.exports = { dispatch, menuForViewer, computeSummary, renderBookingsList, followUpsToChips };
