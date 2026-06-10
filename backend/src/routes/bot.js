@@ -63,6 +63,7 @@ const LLM_SYSTEM_PROMPT = [
   "  - get_rates({bank_code?, tenure_months?, customer_type?}): look up rate rows",
   "  - compare_rates({tenure_months, customer_type?}): side-by-side comparison for a tenure",
   "Never invent a tool. Never claim a tool returned data it did not.",
+  "When the user asks for a comparison, make AT MOST 2 tool calls (e.g. one list_banks and one compare_rates), then give the final answer in the next turn.",
   "",
   "FORMAT:",
   "  - Use Indian rupees (Rs) and Indian conventions",
@@ -172,7 +173,13 @@ router.post('/llm', async (req, res) => {
     system: LLM_SYSTEM_PROMPT,
     userMessage: message,
     tools: TOOL_DEFS,
-    toolHandlers: { list_banks: dispatchTool, get_rates: dispatchTool, compare_rates: dispatchTool },
+    // Each handler takes only (args) and is bound to its name
+    // because dispatchTool has signature (name, args), not (args).
+    toolHandlers: {
+      list_banks:    (args) => dispatchTool('list_banks',    args),
+      get_rates:     (args) => dispatchTool('get_rates',     args),
+      compare_rates: (args) => dispatchTool('compare_rates', args),
+    },
     userId: isAuthed ? req.user.userId : null,
     ip: req.ip,
   });

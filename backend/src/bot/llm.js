@@ -28,6 +28,7 @@
 
 const https = require('https');
 const { URL } = require('url');
+// Keep https import for legacy/fallback (unused)
 
 // Strip <think>...</think> (non-greedy, multiline) from model output.
 // If the model emits an unterminated <think> (truncation), strip
@@ -53,36 +54,37 @@ function readEnv() {
 }
 
 /**
- * POST a JSON body to a URL using Node's https module with a
- * hard timeout. Returns { status, body, raw }.
+ * POST a JSON body to a URL using Node's built-in fetch (undici
+ * under the hood). Uses an AbortController for the timeout.
+ * Returns { status, body, raw }.
+ *
+ * Why fetch and not https: the MiniMax API rejects or rate-limits
+ * requests sent via Node's `https` module (TLS fingerprint
+ * mismatch — same body works via curl / urllib / fetch). Tested
+ * with Node 18+ global fetch.
  */
-function httpsPost({ url, headers, body, timeoutMs }) {
-  return new Promise((resolve, reject) => {
-    let u;
-    try { u = new URL(url); } catch (e) { reject(e); return; }
-    const req = https.request({
+async function httpsPost({ url, headers, body, timeoutMs }) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
       method: 'POST',
-      hostname: u.hostname,
-      port: u.port || 443,
-      path: u.pathname + u.search,
-      headers: { ...headers, 'Content-Length': Buffer.byteLength(body) },
-    }, (res) => {
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        let parsed = null;
-        try { parsed = JSON.parse(raw); } catch (e) { /* leave null */ }
-        resolve({ status: res.statusCode, body: parsed, raw });
-      });
+      headers,
+      body,
+      signal: ctrl.signal,
     });
-    req.on('error', (e) => reject(e));
-    req.setTimeout(timeoutMs, () => {
-      req.destroy(new Error('upstream_timeout'));
-    });
-    req.write(body);
-    req.end();
-  });
+    const raw = await r.text();
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch (e) { /* leave null */ }
+    return { status: r.status, body: parsed, raw };
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || e.code === 'ABORT_ERR')) {
+      throw new Error('upstream_timeout');
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 /**
@@ -116,8 +118,10 @@ async function chatCompletion(opts) {
   let finishReason = 'stop';
   let lastContent = '';
 
-  // Cap iterations to prevent runaway spend / infinite loops
-  const MAX_ITER = 3;
+  // Cap iterations to prevent runaway spend / infinite loops.
+  // 2 is enough for our 3 read-only tools: list_banks then
+  // compare_rates, then the model should answer.
+  const MAX_ITER = 2;
   for (let i = 0; i < MAX_ITER; i++) {
     const body = JSON.stringify({
       model,
@@ -145,14 +149,16 @@ async function chatCompletion(opts) {
       return { __error: true, status: 401, reason: 'auth_failed' };
     }
     if (res.status === 429) {
-      // MiniMax returns two distinct 429s:
-      //   - rate_limit_error     (RPM/TPM cap, retryable)
-      //   - usage_limit_error    (account quota, not retryable in-window)
-      // We inspect the body to pick the right reason.
-      const errType = res.body && res.body.error && res.body.error.type;
-      const reason = errType === 'usage_limit_error'
-        ? 'upstream_quota_exceeded'
-        : 'upstream_rate_limited';
+      // MiniMax returns 429s with type='rate_limit_error' for both
+      //   - per-minute RPM/TPM cap (retryable)
+      //   - per-account usage quota (not retryable in-window)
+      // We inspect the body message for 'usage limit' to pick the
+      // right reason, since the 'type' alone is not reliable.
+      const errType  = res.body && res.body.error && res.body.error.type;
+      const errMsg   = res.body && res.body.error && res.body.error.message;
+      const isQuota  = errType === 'usage_limit_error'
+        || (typeof errMsg === 'string' && /usage\s*limit/i.test(errMsg));
+      const reason = isQuota ? 'upstream_quota_exceeded' : 'upstream_rate_limited';
       logCall({ userId, ip, iter: i, status: 429, reason, usage: null, latencyMs: 0 });
       return { __error: true, status: 503, reason };
     }
@@ -174,7 +180,10 @@ async function chatCompletion(opts) {
     }
 
     const msg = choice.message || {};
-    lastContent = msg.content || '';
+    // If the model emitted both content AND tool_calls, treat the
+    // content as part of the final reply (some models do this when
+    // they have a quick preamble before invoking a tool).
+    if (msg.content) lastContent = msg.content;
 
     // No tool calls? -> final answer
     if (!msg.tool_calls || !msg.tool_calls.length) break;
@@ -203,6 +212,9 @@ async function chatCompletion(opts) {
           result = { error: 'tool_failed', message: String(e && e.message || e) };
         }
       }
+      if (process.env.LLM_DEBUG) {
+        console.log('[llm-debug] tool', name, '-> result keys:', Object.keys(result || {}));
+      }
       toolsUsed.push({ name, args, result });
       messages.push({
         role: 'tool',
@@ -213,7 +225,39 @@ async function chatCompletion(opts) {
     // loop again with tool results in the message history
   }
 
-  const cleaned = stripThinkTags(lastContent);
+  // If we exited the loop with no final content (model kept
+  // calling tools without answering), force one more no-tools
+  // call asking the model to summarize the tool results it has.
+  // This prevents empty-text responses when MAX_ITER is hit.
+  // First strip think tags to see if there is a real answer
+  const preCleaned = stripThinkTags(lastContent);
+
+  // If the cleaned text is empty (model only emitted think tags,
+  // or nothing at all) and we have tool results, force one more
+  // no-tools call asking the model to summarize.
+  if (!preCleaned && toolsUsed.length > 0) {
+    try {
+      messages.push({
+        role: 'user',
+        content: 'You have all the data you need. Now write the final answer to my original question in 1-3 short sentences. Do not call any more tools.',
+      });
+      const fb = JSON.stringify({ model, messages, max_completion_tokens: maxTokens, temperature });
+      const fbh = { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };
+      const fbres = await httpsPost({ url: baseUrl + '/chat/completions', headers: fbh, body: fb, timeoutMs });
+      if (fbres.status >= 200 && fbres.status < 300 && fbres.body && fbres.body.choices) {
+        const fc = fbres.body.choices[0].message || {};
+        lastContent = fc.content || lastContent;
+        if (fbres.body.usage) {
+          totalUsage.prompt_tokens     += fbres.body.usage.prompt_tokens     || 0;
+          totalUsage.completion_tokens += fbres.body.usage.completion_tokens || 0;
+          totalUsage.total_tokens      += fbres.body.usage.total_tokens      || 0;
+        }
+        finishReason = fbres.body.choices[0].finish_reason || finishReason;
+      }
+    } catch (e) { /* leave lastContent empty; caller handles it */ }
+  }
+
+  const cleaned = preCleaned;
 
   logCall({
     userId, ip,

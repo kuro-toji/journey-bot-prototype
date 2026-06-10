@@ -569,12 +569,19 @@
     state.busy = false;
 
     if (r && r.__error) {
-      const msg = llmErrorToText(r.data && r.data.reason || r.reason);
+      const reason = r.data && r.data.reason || r.reason;
+      const msg = llmErrorToText(reason);
       appendMessage('bot', msg, true);
-      appendChips([
+      // When the LLM is unavailable, offer a relevant FAQ chip so
+      // the user has a productive next step. The keyword heuristic
+      // maps common user intents to the best matching FAQ.
+      const fallback = llmFallbackChip(text);
+      const chips = [
         { intent: 'main_menu', label: '← Main menu' },
         { intent: 'talk_to_assistant', label: 'Try again' },
-      ]);
+      ];
+      if (fallback) chips.push(fallback);
+      appendChips(chips);
       return;
     }
 
@@ -604,18 +611,49 @@
       case 'auth_failed':
         return 'The AI assistant is not configured correctly (auth failed). Please contact the admin.';
       case 'upstream_quota_exceeded':
-        return 'The AI assistant has hit its usage quota. Please try again later or use the FAQ bot.';
+        return "The AI assistant has hit its usage quota and is currently unavailable. " +
+               "Try the FAQ bot below or come back later.";
       case 'upstream_rate_limited':
-        return 'The AI assistant is busy. Please try again in a few seconds.';
+        return "The AI assistant is busy right now. Try the FAQ bot below or retry in a minute.";
       case 'upstream_timeout':
-        return 'The AI took too long. Try a shorter question.';
+        return 'The AI took too long. Try a shorter question, or use the FAQ bot below.';
       case 'rate_limited':
-        return "You've used all your AI questions for this hour. Try the FAQ bot or come back later.";
+        return "You've used all your AI questions for this hour. The FAQ bot below has the same answers with no rate limit.";
       case 'message_too_long':
         return 'Your question is too long. Please keep it under 500 characters.';
       default:
-        return 'The AI assistant is having trouble. Please try again, or use the FAQ bot.';
+        return 'The AI assistant is having trouble. The FAQ bot below has the same answers.';
     }
+  }
+
+  // Keyword-to-FAQ heuristic. If the user's question is clearly
+  // about a topic we have an FAQ for, return the matching chip so
+  // the error message can offer a productive next step.
+  function llmFallbackChip(userText) {
+    const t = (userText || '').toLowerCase();
+    if (/\b(book|booking|how do i (open|start)|sign ?up)\b/.test(t))
+      return { intent: 'faq_how_to_book', label: 'How do I book an FD? (FAQ)' };
+    if (/\b(kyc|know your customer)\b/.test(t))
+      return { intent: 'faq_what_is_kyc', label: 'What is KYC? (FAQ)' };
+    if (/\b(vkyc|video kyc)\b/.test(t))
+      return { intent: 'faq_why_vkyc', label: 'Why is VKYC required? (FAQ)' };
+    if (/\b(aadhaar|aadhar|ekyc)\b/.test(t))
+      return { intent: 'faq_aadhaar_ekyc', label: 'What is Aadhaar eKYC? (FAQ)' };
+    if (/\b(compare|comparison|best rate|highest rate|which bank)\b/.test(t))
+      return { intent: 'faq_fd_comparison', label: 'How do I compare FDs? (FAQ)' };
+    if (/\b(tax|tds|taxation)\b/.test(t))
+      return { intent: 'faq_taxation', label: 'How is FD interest taxed? (FAQ)' };
+    if (/\b(senior|60\+)\b/.test(t))
+      return { intent: 'faq_senior_citizen', label: 'Senior citizen rates? (FAQ)' };
+    if (/\b(min|minimum|smallest)\b/.test(t))
+      return { intent: 'faq_min_amount', label: 'Minimum FD amount? (FAQ)' };
+    if (/\b(dicgc|insurance|safe)\b/.test(t))
+      return { intent: 'faq_dicgc', label: 'What is DICGC? (FAQ)' };
+    if (/\b(compound|compounding|quarterly)\b/.test(t))
+      return { intent: 'faq_compounding', label: 'What is compounding? (FAQ)' };
+    if (/\b(cumulative|non-cumulative|payout)\b/.test(t))
+      return { intent: 'faq_cumulative_vs_non_cumulative', label: 'Cumulative vs Non-Cumulative? (FAQ)' };
+    return null;
   }
 
   function appendTypingLabel(text) {
