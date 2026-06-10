@@ -11,11 +11,21 @@ async function loadRates() {
           <div class="card">
             <div class="card-header">
               <div class="bank-name">${rate.bank_name}</div>
-              <div class="rate-highlight">${ratePct}% p.a.</div>
+              <div class="rate-highlight">${ratePct}%</div>
             </div>
             <div class="rate-details">
-              <span>Tenure: ${rate.tenure_months} months</span>
-              <span>Min: ₹${rate.min_fd_amount}</span>
+              <div class="detail-row">
+                <span class="detail-label">Tenure</span>
+                <span class="detail-value">${rate.tenure_months} months</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Min. Amount</span>
+                <span class="detail-value">₹${rate.min_fd_amount}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Type</span>
+                <span class="detail-value" style="text-transform: capitalize;">${rate.payout_type.replace('_', ' ')}</span>
+              </div>
             </div>
             <button class="btn" onclick="bookFd(${rate.rate_id})">Book Now</button>
           </div>

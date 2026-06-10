@@ -3,30 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FD Platform - Verify OTP</title>
+  <title>JFS Platform - Verify OTP</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-  <div class="container">
+  <div class="app-wrapper">
     <header>
-      <h1>FD Platform</h1>
+      <h1>JFS Fixed Deposits</h1>
     </header>
     
-    <main>
-      <h2>Verify Mobile</h2>
-      <p>Enter the 6-digit OTP sent to +91 <span id="displayPhone"></span></p>
-      
-      <form id="otpForm" onsubmit="handleOtp(event)">
-        <div class="form-group">
-          <label for="otp">OTP</label>
-          <input type="text" id="otp" placeholder="123456" maxlength="6" value="123456" autocomplete="one-time-code">
-          <div id="otpError" class="error"></div>
+    <div class="container center-content">
+      <main style="width: 100%;">
+        <div class="narrow-content">
+          <h2>Verify Mobile</h2>
+          <p>Enter the 6-digit OTP sent to +91 <span id="displayPhone" style="font-weight: 600;"></span></p>
+          
+          <form id="otpForm" onsubmit="handleOtp(event)" style="box-shadow: none; border: none; padding: 0;">
+            <div class="form-group" style="text-align: left;">
+              <label for="otp">OTP</label>
+              <input type="text" id="otp" placeholder="123456" maxlength="6" value="123456" autocomplete="one-time-code">
+              <div id="otpError" class="error"></div>
+            </div>
+            
+            <button type="submit" id="submitBtn" class="btn">Verify OTP</button>
+            <a href="/login.html" class="btn btn-secondary" style="margin-top: 1rem;">Back to Login</a>
+          </form>
         </div>
-        
-        <button type="submit" id="submitBtn" class="btn">Verify OTP</button>
-        <a href="/login.html" class="btn btn-secondary" style="margin-top: 1rem;">Back to Login</a>
-      </form>
-    </main>
+      </main>
+    </div>
   </div>
   
   <script src="/js/api.js"></script>

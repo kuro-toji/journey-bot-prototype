@@ -3,24 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FD Platform - Rates</title>
+  <title>JFS Platform - Rates</title>
   <link rel="stylesheet" href="/css/styles.css">
   <script>
-    if (!localStorage.getItem('token')) {
-      window.location.replace('/login.html');
-    }
+    if (!localStorage.getItem('token')) window.location.replace('/login.html');
   </script>
 </head>
 <body>
-  <div class="container">
+  <div class="app-wrapper">
     <header>
-      <h1>Discover FDs</h1>
-      <button onclick="logout()" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Logout</button>
+      <h1>JFS Fixed Deposits</h1>
+      <nav class="desktop-nav">
+        <a href="/rates.html" class="active">Discover</a>
+        <a href="/portfolio.html">Portfolio</a>
+        <a href="#" onclick="logout()">Logout</a>
+      </nav>
+      <!-- Mobile logout -->
+      <a href="#" onclick="logout()" style="display: block;" class="mobile-only">Logout</a>
     </header>
     
-    <main>
-      <div id="ratesList">Loading rates...</div>
-    </main>
+    <div class="container">
+      <main>
+        <h2>Discover High-Yield FDs</h2>
+        <p>Book a Fixed Deposit in minutes. Zero paperwork.</p>
+        <div id="ratesList">Loading rates...</div>
+      </main>
+    </div>
     
     <div class="bottom-nav">
       <a href="/rates.html" class="nav-item active">Rates</a>
@@ -36,5 +44,10 @@
       window.location.href = '/login.html';
     }
   </script>
+  <style>
+    @media (min-width: 768px) {
+      .mobile-only { display: none !important; }
+    }
+  </style>
 </body>
 </html>

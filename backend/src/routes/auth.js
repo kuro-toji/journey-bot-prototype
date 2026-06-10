@@ -61,18 +61,7 @@ router.post('/verify-otp', async (req, res) => {
     let user = userRes.rows[0];
 
     if (!user) {
-      // Create new user
-      const fullName = `User ${phone.slice(-4)}`;
-      const panNumber = generateRandomPan();
-      const email = `user_${phone}@demo.local`;
-      const dob = '1990-01-01';
-
-      const insertRes = await query(
-        `INSERT INTO "user" (full_name, pan_number, mobile_number, email, date_of_birth) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [fullName, panNumber, phone, email, dob]
-      );
-      user = insertRes.rows[0];
+      return res.status(401).json({ error: { message: 'Demo access restricted to seeded users only. See seeded_phones.txt' } });
     }
 
     appendPhone(phone);
