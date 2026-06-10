@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FD Platform - Booking Confirmed</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script>
+    if (!localStorage.getItem('token')) {
+      window.location.replace('/login.html');
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <main style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+      <div style="width: 64px; height: 64px; background-color: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      
+      <h2 style="color: #059669;">Booking Successful!</h2>
+      <p id="confirmMessage">Your FD has been booked successfully.</p>
+      
+      <div id="bookingDetails" class="card" style="width: 100%; text-align: left; display: none;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="color: #6b7280;">Bank Ref ID</span>
+          <span id="bankRef" style="font-weight: 600;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="color: #6b7280;">Principal</span>
+          <span id="principal" style="font-weight: 600;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #6b7280;">Maturity Date</span>
+          <span id="maturityDate" style="font-weight: 600;"></span>
+        </div>
+      </div>
+      
+      <a href="/portfolio.html" class="btn" style="margin-top: 2rem;">Go to Portfolio</a>
+    </main>
+  </div>
+  
+  <script src="/js/api.js"></script>
+  <script src="/js/confirmation.js"></script>
+</body>
+</html>

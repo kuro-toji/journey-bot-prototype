@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FD Platform - Portfolio</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script>
+    if (!localStorage.getItem('token')) {
+      window.location.replace('/login.html');
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>My Portfolio</h1>
+      <button onclick="logout()" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Logout</button>
+    </header>
+    
+    <main>
+      <div id="portfolioList">Loading portfolio...</div>
+    </main>
+    
+    <div class="bottom-nav">
+      <a href="/rates.html" class="nav-item">Rates</a>
+      <a href="/portfolio.html" class="nav-item active">Portfolio</a>
+    </div>
+  </div>
+  
+  <script src="/js/api.js"></script>
+  <script src="/js/portfolio.js"></script>
+  <script>
+    function logout() {
+      localStorage.removeItem('token');
+      window.location.href = '/login.html';
+    }
+  </script>
+</body>
+</html>

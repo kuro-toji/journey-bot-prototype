@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FD Platform - Rates</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script>
+    if (!localStorage.getItem('token')) {
+      window.location.replace('/login.html');
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Discover FDs</h1>
+      <button onclick="logout()" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Logout</button>
+    </header>
+    
+    <main>
+      <div id="ratesList">Loading rates...</div>
+    </main>
+    
+    <div class="bottom-nav">
+      <a href="/rates.html" class="nav-item active">Rates</a>
+      <a href="/portfolio.html" class="nav-item">Portfolio</a>
+    </div>
+  </div>
+  
+  <script src="/js/api.js"></script>
+  <script src="/js/rates.js"></script>
+  <script>
+    function logout() {
+      localStorage.removeItem('token');
+      window.location.href = '/login.html';
+    }
+  </script>
+</body>
+</html>
