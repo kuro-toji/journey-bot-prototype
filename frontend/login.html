@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FD Platform - Login</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>FD Platform</h1>
+    </header>
+    
+    <main>
+      <h2>Welcome Back</h2>
+      <p>Enter your mobile number to continue</p>
+      
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="phone">Mobile Number</label>
+          <input type="tel" id="phone" placeholder="Enter 10 digit number" maxlength="10" autocomplete="tel">
+          <div id="loginError" class="error"></div>
+        </div>
+        
+        <button type="submit" id="submitBtn" class="btn">Continue</button>
+      </form>
+
+      <div style="margin-top: 2rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; font-size: 0.875rem;">
+        <strong>Demo Hint:</strong> Use any 10-digit number. An account will be created automatically. Use OTP: 123456
+      </div>
+    </main>
+  </div>
+  
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

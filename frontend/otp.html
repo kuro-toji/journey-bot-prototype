@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FD Platform - Verify OTP</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>FD Platform</h1>
+    </header>
+    
+    <main>
+      <h2>Verify Mobile</h2>
+      <p>Enter the 6-digit OTP sent to +91 <span id="displayPhone"></span></p>
+      
+      <form id="otpForm" onsubmit="handleOtp(event)">
+        <div class="form-group">
+          <label for="otp">OTP</label>
+          <input type="text" id="otp" placeholder="123456" maxlength="6" value="123456" autocomplete="one-time-code">
+          <div id="otpError" class="error"></div>
+        </div>
+        
+        <button type="submit" id="submitBtn" class="btn">Verify OTP</button>
+        <a href="/login.html" class="btn btn-secondary" style="margin-top: 1rem;">Back to Login</a>
+      </form>
+    </main>
+  </div>
+  
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>
