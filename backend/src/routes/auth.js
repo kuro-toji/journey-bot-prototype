@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../config/db');
 const { sign } = require('../utils/jwt');
+const { setCache, clearCache, clearAllCache } = require('../bot/cache');
+const { clearTokensForUser } = require('../bot/verify');
 const fs = require('fs');
 const path = require('path');
 
@@ -66,6 +68,28 @@ router.post('/verify-otp', async (req, res) => {
 
     appendPhone(phone);
 
+    // Warm the bot cache so /api/bot/ask for 'my FDs' etc. are
+    // served from memory for this session. Defense-in-depth: clear
+    // any stale entries for this userId before populating.
+    clearCache(user.user_id);
+    clearTokensForUser(user.user_id);
+    try {
+      const bRes = await query(
+        `SELECT j.booking_id, j.bank_reference_id, m.bank_code, m.bank_name,
+                j.tenure_months, j.interest_rate_bps, j.customer_type,
+                j.principal, j.maturity_amount, j.booking_date, j.maturity_date, j.state
+           FROM journey j
+           JOIN master m ON j.rate_id = m.rate_id
+          WHERE j.user_id = $1
+          ORDER BY j.booking_date DESC
+          LIMIT 50`,
+        [user.user_id]
+      );
+      setCache(user.user_id, { bookings: bRes.rows });
+    } catch (e) {
+      console.error('Bot cache warm-up failed:', e);
+    }
+
     const token = sign({ userId: user.user_id, phone: user.mobile_number });
     res.json({ success: true, token, user });
   } catch (error) {
@@ -75,6 +99,19 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 const { authRequired } = require('../middleware/auth');
+
+router.post('/logout', authRequired, async (req, res) => {
+  try {
+    if (req.auth && req.auth.userId) {
+      clearCache(req.auth.userId);
+      clearTokensForUser(req.auth.userId);
+    }
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Logout error:', e);
+    res.status(500).json({ error: { message: 'Internal server error' } });
+  }
+});
 
 router.get('/me', authRequired, async (req, res) => {
   try {
