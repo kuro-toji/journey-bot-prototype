@@ -58,7 +58,7 @@ router.post('/book', authRequired, async (req, res) => {
         $1, $2, $3, $4,
         $5, $6, $7, $8,
         $9, $10, $11, $12,
-        CURRENT_DATE, CURRENT_DATE + ($6::text || ' days')::INTERVAL, 'fd_active',
+        CURRENT_DATE, CURRENT_DATE + ($6 * INTERVAL '1 day'), 'fd_active',
         $13, $14,
         NOW(), NOW(), NOW(), NOW(), NOW()
       ) RETURNING *
