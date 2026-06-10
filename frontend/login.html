@@ -3,41 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JFS Platform - Login</title>
+  <title>JioFinance - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
   <div class="app-wrapper">
     <header>
-      <h1>JFS Fixed Deposits</h1>
+      <div class="brand-mark">
+        <div class="brand-logo">Jio</div>
+        <h1>Fixed Deposit</h1>
+      </div>
     </header>
-    
+
     <div class="container center-content">
       <main style="width: 100%;">
         <div class="narrow-content">
           <h2>Welcome Back</h2>
           <p>Enter your registered mobile number to continue</p>
-          
-          <form id="loginForm" onsubmit="handleLogin(event)" style="box-shadow: none; border: none; padding: 0;">
-            <div class="form-group" style="text-align: left;">
+
+          <form id="loginForm" onsubmit="handleLogin(event)" class="narrow-form">
+            <div class="form-group">
               <label for="phone">Mobile Number</label>
               <input type="tel" id="phone" placeholder="Enter 10 digit number" maxlength="10" autocomplete="tel">
               <div id="loginError" class="error"></div>
             </div>
-            
-            <button type="submit" id="submitBtn" class="btn">Continue</button>
+
+            <button type="submit" id="submitBtn" class="btn btn-block">Continue</button>
           </form>
 
-          <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem; text-align: left; color: var(--text-secondary);">
-            <strong>Demo Access:</strong> Only pre-seeded numbers are allowed. <br>
-            Use <strong>9714503400</strong> or check <code>data/seeded_phones.txt</code>. <br>
-            OTP is universally <strong>123456</strong>.
+          <div class="demo-box">
+            <strong>Demo Access:</strong> Only pre-seeded numbers are allowed.<br>
+            Use <code>9714503400</code> or check <code>data/seeded_phones.txt</code>.<br>
+            OTP is universally <code>123456</code>.
           </div>
         </div>
       </main>
     </div>
+
+    <footer>
+      <a href="#" onclick="return false">Terms of Use</a>
+      <a href="#" onclick="return false">Privacy policy</a>
+    </footer>
   </div>
-  
+
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
 </body>

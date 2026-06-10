@@ -17,3 +17,5 @@ Thumbs.db
 # Database & docs (per user request — do not commit)
 PLAN.md
 db/
+changes.md
+data/

@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JFS Platform - Portfolio</title>
+  <title>JioFinance - Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     if (!localStorage.getItem('token')) window.location.replace('/login.html');
@@ -12,16 +15,18 @@
 <body>
   <div class="app-wrapper">
     <header>
-      <h1>JFS Fixed Deposits</h1>
+      <div class="brand-mark">
+        <div class="brand-logo">Jio</div>
+        <h1>Fixed Deposit</h1>
+      </div>
       <nav class="desktop-nav">
         <a href="/rates.html">Discover</a>
         <a href="/portfolio.html" class="active">Portfolio</a>
         <a href="#" onclick="logout()">Logout</a>
       </nav>
-      <!-- Mobile logout -->
-      <a href="#" onclick="logout()" style="display: block;" class="mobile-only">Logout</a>
+      <a href="#" onclick="logout()" class="btn-link mobile-only">Logout</a>
     </header>
-    
+
     <div class="container">
       <main>
         <h2>Your Investments</h2>
@@ -29,13 +34,18 @@
         <div id="portfolioList">Loading portfolio...</div>
       </main>
     </div>
-    
+
+    <footer>
+      <a href="#" onclick="return false">Terms of Use</a>
+      <a href="#" onclick="return false">Privacy policy</a>
+    </footer>
+
     <div class="bottom-nav">
-      <a href="/rates.html" class="nav-item">Rates</a>
+      <a href="/rates.html" class="nav-item">Discover</a>
       <a href="/portfolio.html" class="nav-item active">Portfolio</a>
     </div>
   </div>
-  
+
   <script src="/js/api.js"></script>
   <script src="/js/portfolio.js"></script>
   <script>
@@ -44,10 +54,5 @@
       window.location.href = '/login.html';
     }
   </script>
-  <style>
-    @media (min-width: 768px) {
-      .mobile-only { display: none !important; }
-    }
-  </style>
 </body>
 </html>

@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JFS Platform - Aadhaar eKYC</title>
+  <title>JioFinance - Aadhaar eKYC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     if (!localStorage.getItem('token')) window.location.replace('/login.html');
@@ -12,58 +15,61 @@
 <body>
   <div class="app-wrapper">
     <header>
-      <h1>Aadhaar eKYC</h1>
+      <div class="brand-mark">
+        <div class="brand-logo">Jio</div>
+        <h1>Aadhaar eKYC</h1>
+      </div>
       <nav class="desktop-nav"><a href="/rates.html">Cancel</a></nav>
-      <a href="/rates.html" style="color:#ffffff; text-decoration:none; font-weight:500;" class="mobile-only">Cancel</a>
+      <a href="/rates.html" class="btn-link mobile-only">Cancel</a>
     </header>
-    
+
     <div class="container center-content">
       <main style="width: 100%;">
         <div class="narrow-content">
-          <div style="margin-bottom: 1.5rem; text-align: left;">
-            <span class="status-badge" style="background: #e0e7ff; color: #3730a3; padding: 0.5rem 1rem;">Step 2 of 4: Aadhaar</span>
-          </div>
-          
-          <div id="stepInitiate" style="box-shadow: none; border: none; padding: 0; text-align: left;">
+          <span class="step-badge">Step 2 of 4: Aadhaar</span>
+
+          <div id="stepInitiate" class="narrow-form" style="padding: 0; border: none; box-shadow: none; background: transparent;">
             <h2>Aadhaar Verification</h2>
             <p>Enter your 12-digit Aadhaar number to receive an OTP on your registered mobile number.</p>
-            
-            <form id="aadhaarForm" onsubmit="handleAadhaar(event)" style="box-shadow: none; border: none; padding: 0;">
+
+            <form id="aadhaarForm" onsubmit="handleAadhaar(event)" class="narrow-form">
               <div class="form-group">
                 <label for="aadhaar">Aadhaar Number</label>
                 <input type="text" id="aadhaar" placeholder="1234 5678 9012" maxlength="12" required>
               </div>
-              
+
               <div id="aadhaarError" class="error"></div>
-              
-              <button type="submit" id="submitBtn" class="btn" style="margin-top: 1.5rem;">Send OTP</button>
+
+              <button type="submit" id="submitBtn" class="btn btn-block" style="margin-top: 1rem;">Send OTP</button>
             </form>
           </div>
 
-          <div id="stepVerify" style="display: none; box-shadow: none; border: none; padding: 0; text-align: left;">
+          <div id="stepVerify" style="display: none; padding: 0; border: none; box-shadow: none; background: transparent;">
             <h2>Verify OTP</h2>
             <p>Enter the 6-digit OTP sent to your Aadhaar-linked mobile number.</p>
-            
-            <form id="otpForm" onsubmit="handleOtp(event)" style="box-shadow: none; border: none; padding: 0;">
+
+            <form id="otpForm" onsubmit="handleOtp(event)" class="narrow-form">
               <div class="form-group">
                 <label for="otp">OTP</label>
                 <input type="text" id="otp" placeholder="123456" maxlength="6" value="123456" required>
               </div>
-              
+
               <div id="otpError" class="error"></div>
-              
-              <button type="submit" id="verifyBtn" class="btn" style="margin-top: 1.5rem;">Verify & Continue</button>
+
+              <button type="submit" id="verifyBtn" class="btn btn-block" style="margin-top: 1rem;">Verify &amp; Continue</button>
             </form>
           </div>
         </div>
       </main>
     </div>
+
+    <footer>
+      <a href="#" onclick="return false">Terms of Use</a>
+      <a href="#" onclick="return false">Privacy policy</a>
+    </footer>
   </div>
-  
+
   <script src="/js/api.js"></script>
   <script src="/js/aadhaar.js"></script>
-  <style>
-    @media (min-width: 768px) { .mobile-only { display: none !important; } }
-  </style>
 </body>
 </html>

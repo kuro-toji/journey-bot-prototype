@@ -41,7 +41,12 @@ router.post('/book', authRequired, async (req, res) => {
 
     const rateBps = customerType === 'senior_citizen' ? rate.senior_citizen_rate_bps : rate.interest_rate_bps;
     const maturityAmount = calculateMaturity(principal, rateBps, rate.tenure_months);
-    
+
+    // Compute maturity_date in JS to avoid PG parameter type conflict
+    const today = new Date();
+    const maturityDate = new Date(today);
+    maturityDate.setDate(maturityDate.getDate() + rate.tenure_days);
+
     const bookingId = generateId('bk_fd_', 5);
     const bankRefId = generateId('REF', 8);
 
@@ -58,8 +63,8 @@ router.post('/book', authRequired, async (req, res) => {
         $1, $2, $3, $4,
         $5, $6, $7, $8,
         $9, $10, $11, $12,
-        CURRENT_DATE, CURRENT_DATE + ($6 * INTERVAL '1 day'), 'fd_active',
-        $13, $14,
+        $13, $14, 'fd_active',
+        $15, $16,
         NOW(), NOW(), NOW(), NOW(), NOW()
       ) RETURNING *
     `;
@@ -68,6 +73,7 @@ router.post('/book', authRequired, async (req, res) => {
       bookingId, bankRefId, userId, rateId,
       rate.tenure_months, rate.tenure_days, rateBps, customerType,
       rate.compounding, rate.payout_type, principal, maturityAmount,
+      today.toISOString().slice(0, 10), maturityDate.toISOString().slice(0, 10),
       nomineeName || null, nomineeRelationship || null
     ];
 

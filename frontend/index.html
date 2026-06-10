@@ -3,15 +3,95 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FD Platform - Redirecting</title>
-  <script>
-    if (localStorage.getItem('token')) {
-      window.location.replace('/rates.html');
-    } else {
-      window.location.replace('/login.html');
+  <title>JioFinance - Fixed Deposit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    /* Landing-page-only polish */
+    .landing-hero {
+      padding: 1rem 0 0.25rem;
     }
-  </script>
+    .landing-hero h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    .landing-hero p {
+      margin: 0.25rem 0 1.25rem;
+      color: var(--text-secondary);
+    }
+    .signin-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 36px;
+      padding: 0 18px;
+      background-color: var(--primary-color);
+      color: #000;
+      border: 1px solid var(--primary-color);
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background-color 0.15s;
+    }
+    .signin-btn:hover { background-color: var(--primary-hover); }
+    .signin-btn--ghost {
+      background-color: transparent;
+      color: var(--text-content);
+      border: 1px solid var(--border-color);
+    }
+    .signin-btn--ghost:hover { background-color: var(--bg-color); border-color: var(--text-content); }
+    .top-actions { display: flex; align-items: center; gap: 0.75rem; }
+    @media (max-width: 767px) {
+      .top-actions-desktop { display: none; }
+    }
+  </style>
 </head>
 <body>
+  <div class="app-wrapper">
+    <header>
+      <div class="brand-mark">
+        <div class="brand-logo">Jio</div>
+        <h1>Fixed Deposit</h1>
+      </div>
+
+      <div class="top-actions">
+        <nav class="desktop-nav top-actions-desktop">
+          <a href="#" onclick="return false">Personal</a>
+          <a href="#" onclick="return false">Business</a>
+          <a href="#" onclick="return false">Help</a>
+        </nav>
+        <a id="signinLink" href="/login.html" class="signin-btn">Sign in</a>
+      </div>
+    </header>
+
+    <div class="container">
+      <main>
+        <div class="landing-hero">
+          <h1>Explore our Fixed Deposit options</h1>
+          <p>Compare rates across 5 trusted banking partners. Sign in to book.</p>
+        </div>
+        <div id="bankList">Loading partner banks…</div>
+      </main>
+    </div>
+
+    <footer>
+      <a href="#" onclick="return false">Terms of Use</a>
+      <a href="#" onclick="return false">Privacy policy</a>
+    </footer>
+
+    <!-- Mobile bottom nav (Sign in / Portfolio) -->
+    <div class="bottom-nav" id="mobileNav">
+      <a id="mobileSignin" href="/login.html" class="nav-item">Sign in</a>
+      <a id="mobilePortfolio" href="#" class="nav-item" style="display:none;">Portfolio</a>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/index.js"></script>
 </body>
 </html>

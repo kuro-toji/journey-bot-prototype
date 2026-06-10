@@ -24,6 +24,7 @@ app.get('/api/health', async (req, res) => {
 // Mounted later
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/rates', require('./src/routes/rates'));
+app.use('/api/banks', require('./src/routes/banks'));
 app.use('/api/journey', require('./src/routes/journey'));
 app.use('/api/kyc', require('./src/routes/kyc'));
 

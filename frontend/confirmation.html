@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JFS Platform - Booking Confirmed</title>
+  <title>JioFinance - Booking Confirmed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     if (!localStorage.getItem('token')) window.location.replace('/login.html');
@@ -12,42 +15,50 @@
 <body>
   <div class="app-wrapper">
     <header>
-      <h1>JFS Fixed Deposits</h1>
+      <div class="brand-mark">
+        <div class="brand-logo">Jio</div>
+        <h1>Fixed Deposit</h1>
+      </div>
     </header>
-    
+
     <div class="container center-content">
       <main style="width: 100%;">
         <div class="narrow-content" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
-          <div style="width: 72px; height: 72px; background-color: var(--success-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--success-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <div class="success-circle">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          
-          <h2 style="color: var(--success-color); margin-bottom: 0.5rem;">Booking Successful!</h2>
-          <p id="confirmMessage" style="color: var(--text-secondary);">Your FD has been booked successfully.</p>
-          
-          <div id="bookingDetails" class="card" style="width: 100%; text-align: left; display: none; margin-top: 1rem; border-color: var(--success-color);">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-              <span style="color: var(--text-secondary);">Bank Ref ID</span>
-              <span id="bankRef" style="font-weight: 600; color: var(--text-primary);"></span>
+
+          <h2 style="color: #059669; margin-bottom: 0.4rem;">Booking Successful!</h2>
+          <p id="confirmMessage">Your FD has been booked successfully.</p>
+
+          <div id="bookingDetails" class="card" style="width: 100%; text-align: left; display: none; margin-top: 1rem; border-color: var(--primary-color);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
+              <span style="color: var(--text-secondary); font-size: 0.85rem;">Bank Ref ID</span>
+              <span id="bankRef" style="font-weight: 600;"></span>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-              <span style="color: var(--text-secondary);">Principal</span>
-              <span id="principal" style="font-weight: 600; color: var(--text-primary);"></span>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
+              <span style="color: var(--text-secondary); font-size: 0.85rem;">Principal</span>
+              <span id="principal" style="font-weight: 600;"></span>
             </div>
             <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary);">Maturity Date</span>
-              <span id="maturityDate" style="font-weight: 600; color: var(--text-primary);"></span>
+              <span style="color: var(--text-secondary); font-size: 0.85rem;">Maturity Date</span>
+              <span id="maturityDate" style="font-weight: 600;"></span>
             </div>
           </div>
-          
-          <a href="/portfolio.html" class="btn" style="margin-top: 2rem;">Go to Portfolio</a>
+
+          <a href="/portfolio.html" class="btn" style="margin-top: 1.5rem;">Go to Portfolio</a>
         </div>
       </main>
     </div>
+
+    <footer>
+      <a href="#" onclick="return false">Terms of Use</a>
+      <a href="#" onclick="return false">Privacy policy</a>
+    </footer>
   </div>
-  
+
   <script src="/js/api.js"></script>
   <script src="/js/confirmation.js"></script>
 </body>

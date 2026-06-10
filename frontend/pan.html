@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JFS Platform - PAN Verification</title>
+  <title>JioFinance - PAN Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     if (!localStorage.getItem('token')) window.location.replace('/login.html');
@@ -12,47 +15,47 @@
 <body>
   <div class="app-wrapper">
     <header>
-      <h1>PAN Verification</h1>
-      <nav class="desktop-nav">
-        <a href="/rates.html">Cancel</a>
-      </nav>
-      <a href="/rates.html" style="color:#ffffff; text-decoration:none; font-weight:500;" class="mobile-only">Cancel</a>
+      <div class="brand-mark">
+        <div class="brand-logo">Jio</div>
+        <h1>PAN Verification</h1>
+      </div>
+      <nav class="desktop-nav"><a href="/rates.html">Cancel</a></nav>
+      <a href="/rates.html" class="btn-link mobile-only">Cancel</a>
     </header>
-    
+
     <div class="container center-content">
       <main style="width: 100%;">
         <div class="narrow-content">
-          <div style="margin-bottom: 1.5rem; text-align: left;">
-            <span class="status-badge" style="background: #e0e7ff; color: #3730a3; padding: 0.5rem 1rem;">Step 1 of 4: PAN</span>
-          </div>
-          
-          <h2 style="text-align: left;">Verify your Identity</h2>
-          <p style="text-align: left;">Enter your PAN details to continue</p>
-          
-          <form id="panForm" onsubmit="handlePan(event)" style="box-shadow: none; border: none; padding: 0; text-align: left;">
+          <span class="step-badge">Step 1 of 4: PAN</span>
+          <h2>Verify your Identity</h2>
+          <p>Enter your PAN details to continue</p>
+
+          <form id="panForm" onsubmit="handlePan(event)" class="narrow-form">
             <div class="form-group">
               <label for="pan">PAN Number</label>
               <input type="text" id="pan" placeholder="ABCDE1234F" style="text-transform: uppercase;" required>
             </div>
-            
+
             <div class="form-group">
               <label for="dob">Date of Birth</label>
               <input type="date" id="dob" required>
             </div>
-            
+
             <div id="panError" class="error"></div>
-            
-            <button type="submit" id="submitBtn" class="btn" style="margin-top: 1.5rem;">Verify PAN</button>
+
+            <button type="submit" id="submitBtn" class="btn btn-block" style="margin-top: 1rem;">Verify PAN</button>
           </form>
         </div>
       </main>
     </div>
+
+    <footer>
+      <a href="#" onclick="return false">Terms of Use</a>
+      <a href="#" onclick="return false">Privacy policy</a>
+    </footer>
   </div>
-  
+
   <script src="/js/api.js"></script>
   <script src="/js/pan.js"></script>
-  <style>
-    @media (min-width: 768px) { .mobile-only { display: none !important; } }
-  </style>
 </body>
 </html>
