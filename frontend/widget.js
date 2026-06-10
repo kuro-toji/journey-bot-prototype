@@ -346,13 +346,18 @@
   }
 
   /* ---------- handlers ---------- */
-  async function refreshMenu() {
+  async function refreshMenu(opts) {
     const r = await callBot('/api/bot/menu');
-    if (r && r.menu && r.menu.length) {
-      for (const c of r.menu) rememberChip(c); // seed label map for echo + follow-ups
-      appendChips(r.menu);
-      state.flowChips = r.menu;
+    if (!r || !r.menu || !r.menu.length) return;
+    for (const c of r.menu) rememberChip(c);
+    if (opts && opts.replace) {
+      // remove the last chip group (the now-stale follow-ups) and
+      // append the fresh menu in its place
+      const groups = shadow.querySelectorAll('.fb-chips');
+      if (groups.length) groups[groups.length - 1].remove();
     }
+    appendChips(r.menu);
+    state.flowChips = r.menu;
   }
 
   async function handleIntentClick(intent, label) {
@@ -361,6 +366,14 @@
     // disable all chips to prevent double-click
     const chips = shadow.querySelectorAll('.fb-chip');
     chips.forEach(c => c.disabled = true);
+
+    if (intent === 'main_menu') {
+      // sentinel — re-render the full menu in place
+      appendMessage('user', label || 'Main menu');
+      await refreshMenu({ replace: true });
+      chips.forEach(c => c.disabled = false);
+      return;
+    }
 
     if (intent === 'verify_start') {
       appendMessage('user', label || 'Check my FDs');
