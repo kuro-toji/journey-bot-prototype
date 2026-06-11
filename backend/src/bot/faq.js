@@ -50,7 +50,7 @@ const FAQ = {
       "that insures your bank deposits. Coverage: up to Rs 5,00,000 per depositor per bank. " +
       "This covers both principal and interest. It applies to all commercial banks and " +
       "most cooperative banks. Note: NBFC fixed deposits (like Shriram) are NOT covered by DICGC.",
-    followUps: ['faq_fd_definition', 'faq_premature_withdrawal'],
+    followUps: ['faq_fd_definition', 'faq_premature_withdrawal', 'faq_min_amount'],
   },
   cumulative_vs_non_cumulative: {
     id: 'cumulative_vs_non_cumulative',
@@ -91,7 +91,7 @@ const FAQ = {
       "• Form 26AS / AIS shows the TDS credit — claim it while filing ITR\n" +
       "• Regular FDs do NOT qualify for 80C deduction. Only 5-year Tax-Saver FDs do, " +
       "and they have a lock-in with no premature withdrawal.",
-    followUps: ['faq_senior_citizen', 'faq_premature_withdrawal'],
+    followUps: ['faq_senior_citizen', 'faq_premature_withdrawal', 'faq_compounding'],
   },
   senior_citizen: {
     id: 'senior_citizen',
@@ -119,6 +119,22 @@ const FAQ = {
       "Maximum amounts go up to Rs 1 crore for banks and Rs 50 lakh for the NBFC. " +
       "Each rate card shows the exact min/max for that bank.",
     followUps: ['faq_fd_details', 'check_my_fds'],
+  },
+  premature_withdrawal: {
+    id: 'premature_withdrawal',
+    intent: 'faq_premature_withdrawal',
+    audience: 'all',
+    label: 'What if I withdraw my FD before maturity?',
+    answer:
+      "Premature withdrawal is allowed at most banks, but the rate is reduced. " +
+      "Typically the bank pays 0.5%-1.0% LESS than the contracted rate for the " +
+      "actual tenure you held the FD. Some specifics:\n\n" +
+      "  - SFBs (Maro, Sunset, Nomnom): usually 0.5% penalty\n" +
+      "  - Commercial banks (Ion): usually 1.0% penalty\n" +
+      "  - NBFCs (Mute Finance): often no penalty (check the loan agreement)\n\n" +
+      "You receive the original principal back; only the interest is reduced. " +
+      "TDS already deducted is not adjusted against your final payout.",
+    followUps: ['faq_dicgc', 'faq_taxation', 'check_my_fds'],
   },
   fd_comparison: {
     id: 'fd_comparison',
@@ -265,6 +281,10 @@ const FAQ_TRIGGERS = {
   dicgc: [
     'dicgc', 'dicgc insurance', 'deposit insurance', 'is fd safe',
     'fd insurance', 'insured deposit',
+  ],
+  premature_withdrawal: [
+    'premature withdrawal', 'early withdrawal', 'withdraw fd',
+    'break fd', 'fd before maturity', 'premature',
   ],
   cumulative_vs_non_cumulative: [
     'cumulative vs non', 'cumulative', 'non-cumulative', 'non cumulative',
