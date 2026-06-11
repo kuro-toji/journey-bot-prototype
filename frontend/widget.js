@@ -586,6 +586,15 @@
     }
 
     appendMessage('bot', r.text || '(no reply)');
+    // If the server forwarded to a FAQ (no LLM call), show a
+    // small badge so the user understands the answer came from
+    // the curated FAQ list, not the AI.
+    if (r.forwardedFromFaq) {
+      appendMessage('bot',
+        `_(forwarded from FAQ: ${r.forwardedFromFaq.label})_`,
+        false, 'fb-msg-meta'
+      );
+    }
     // Append usage footer if present
     if (r.usage && r.usage.total_tokens) {
       const toolsBit = (r.toolsUsed && r.toolsUsed.length)

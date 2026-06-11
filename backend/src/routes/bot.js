@@ -18,6 +18,7 @@ const express = require('express');
 const router = express.Router();
 
 const { dispatch, menuForViewer } = require('../bot/service');
+const { matchFaq } = require('../bot/faq');
 const { verifyAnon, clearToken, clearTokensForUser } = require('../bot/verify');
 const { clearCache } = require('../bot/cache');
 const { logAnonQuestion } = require('../bot/log');
@@ -200,6 +201,26 @@ router.post('/llm', async (req, res) => {
   // filtered out for anon viewers.
   const tools = buildToolDefsForRequest({ isAuthed });
   const systemPrompt = buildSystemPrompt({ isAuthed });
+
+  // FAQ forwarding: if the user's free-form text clearly matches
+  // one of the hardcoded FAQ chips, return the FAQ's answer
+  // directly. This saves an LLM call (free, instant) for the
+  // most common questions (DICGC, KYC, compounding, etc.) and
+  // guarantees the user sees the curated answer instead of an
+  // LLM variation. The widget will show a 'forwarded from FAQ'
+  // badge so the user understands the response was matched.
+  const match = matchFaq(message);
+  if (match.faq) {
+    logAnonQuestion({ intent: match.faq.intent, audience: 'faq-forward', ip: req.ip });
+    return res.json({
+      text: match.faq.answer,
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      toolsUsed: [],
+      remaining: r.remaining,
+      limit: r.limit,
+      forwardedFromFaq: { id: match.faq.id, label: match.faq.label, score: match.score },
+    });
+  }
 
   // Every tool handler is wrapped with a context that carries the
   // verified userId. The LLM cannot pass a userId into a tool
