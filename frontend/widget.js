@@ -66,9 +66,15 @@
 }
 .fb-avatar {
   width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid #ecad4f;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+}
+.fb-avatar-inner {
+  width: 22px; height: 22px; border-radius: 50%;
   background: #ecad4f; color: #1f2937;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 14px;
+  font-weight: 700; font-size: 12px;
 }
 .fb-title { font-size: 15px; font-weight: 600; flex: 1; }
 .fb-sub { font-size: 11px; color: #d1d5db; }
@@ -336,7 +342,11 @@
     panel = el('div', { class: 'fb-panel', 'aria-hidden': 'true' });
 
     const header = el('div', { class: 'fb-header' }, [
-      el('div', { class: 'fb-avatar' }, ['F']),
+      el('div', { class: 'fb-avatar' }, [
+        el('span', { class: 'fb-avatar-inner' }, [state.branding && state.branding.bot && state.branding.bot.avatar_text
+          ? state.branding.bot.avatar_text
+          : 'F']),
+      ]),
       el('div', { style: { flex: '1' } }, [
         el('div', { class: 'fb-title' }, ['FinBot']),
         el('div', { class: 'fb-sub' }, ['FD assistant — ask me anything']),
@@ -508,6 +518,8 @@
     appendMessage('bot', r.text);
     appendChips(r.followUps);
     state.flowChips = r.followUps;
+    // re-enable all chips so the user can keep clicking
+    shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
   }
 
   /* ---------- verify flow ---------- */
@@ -581,6 +593,7 @@
     appendMessage('bot', askData.text);
     appendChips(askData.followUps);
     state.flowChips = askData.followUps;
+    shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
   }
 
   async function onSubmitInput() {
@@ -609,6 +622,15 @@
    */
   function enterFreeForm() {
     state.freeForm = true;
+    // Clear the previous FAQ chat history so the free-form mode
+    // starts with a clean slate (just the LLM welcome). Without
+    // this, the old FAQ chips and bot replies would be visible
+    // above the AI welcome, which is visually confusing and
+    // makes it look like the assistant is "stitched on" to the
+    // old chat.
+    bodyEl.innerHTML = '';
+    state.labelMap = Object.create(null);
+    state.flowChips = null;
     setHint('AI mode — ask about FDs or rates. The model will not entertain off-topic questions.');
     setInputVisible(true, 'Ask about FDs, rates, or comparison…', submitLlmQuestion);
     appendMessage('bot',
@@ -657,6 +679,7 @@
       ];
       if (fallback) chips.push(fallback);
       appendChips(chips);
+      shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
       return;
     }
 
@@ -683,19 +706,9 @@
         { intent: 'main_menu', label: '← Main menu' },
       ]);
     }
-    // Append usage footer if present
-    if (r.usage && r.usage.total_tokens) {
-      const toolsBit = (r.toolsUsed && r.toolsUsed.length)
-        ? ` · used ${r.toolsUsed.join(', ')}`
-        : '';
-      const remainingBit = (r.remaining != null)
-        ? ` · ${r.remaining} of ${r.limit} messages left this hour`
-        : '';
-      appendMessage('bot',
-        `_(tokens: ${r.usage.total_tokens}${toolsBit}${remainingBit})_`,
-        false, 'fb-msg-meta'
-      );
-    }
+    // (No usage footer / tokens / remaining-counts shown in the UI.
+    // The per-call cost guard and rate limit still apply server-side
+    // but the user doesn't need to see them in the chat.)
     // Build the follow-up chip row. On success, also include a
     // relevant FAQ fallback chip if the user's text had a
     // recognizable keyword. This way even when the LLM answers
@@ -707,6 +720,8 @@
     const fallback = llmFallbackChip(text);
     if (fallback) followUpChips.push(fallback);
     appendChips(followUpChips);
+    // re-enable all chips so the user can keep clicking
+    shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
   }
 
   function llmErrorToText(reason) {
