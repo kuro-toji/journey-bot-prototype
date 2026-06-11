@@ -95,17 +95,18 @@ function computeSummary(bookings) {
 
 function renderBookingsList(bookings) {
   if (!bookings.length) return 'You have no FD bookings yet.';
-  const lines = bookings.map((b, i) => {
-    const state = b.state === 'fd_active' ? 'Active'
-              : b.state === 'fd_matured' ? 'Matured'
-              : b.state === 'fd_withdrawn' ? 'Withdrawn'
-              : b.state;
-    return `${i + 1}. ${b.bank_name} — ${formatRupee(b.principal)} @ ${(b.interest_rate_bps / 100).toFixed(2)}% `
-         + `for ${b.tenure_months}m (${state})\n`
-         + `   Ref: ${b.bank_reference_id}\n`
-         + `   Matures: ${formatDate(b.maturity_date)} → ${formatRupee(b.maturity_amount)}`;
+  // Render as a markdown table so the widget's scrollable-table
+  // wrapper (overflow-x: auto) can handle wide columns gracefully.
+  const lines = [
+    '| # | Bank | Ref | Principal | Rate | Tenure | Maturity |',
+    '|---|------|-----|-----------|------|--------|----------|',
+  ];
+  bookings.forEach((b, i) => {
+    const rate = (b.interest_rate_bps / 100).toFixed(2) + '%';
+    const tenure = b.tenure_months + 'm';
+    lines.push(`| ${i + 1} | ${b.bank_name} | ${b.bank_reference_id} | ${formatRupee(b.principal)} | ${rate} | ${tenure} | ${formatDate(b.maturity_date)} |`);
   });
-  return lines.join('\n\n');
+  return lines.join('\n');
 }
 
 function resolveIdentity(req) {

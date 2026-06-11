@@ -186,21 +186,35 @@
   line-height: 1.4;
 }
 .fb-md-pre code { color: inherit; background: transparent; padding: 0; }
-.fb-md-table {
-  width: 100%;
-  border-collapse: collapse;
+.fb-md-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin: 6px 0;
-  font-size: 12.5px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+.fb-md-table {
+  border-collapse: collapse;
+  font-size: 11.5px;
+  min-width: 100%;
+  white-space: nowrap;
 }
 .fb-md-table th, .fb-md-table td {
-  border: 1px solid #e5e7eb;
-  padding: 6px 8px;
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 10px;
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
 }
 .fb-md-table th {
   background: #f9fafb;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.fb-md-table tr:last-child td {
+  border-bottom: none;
 }
 .fb-md-hr { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
 .fb-md-quote {
@@ -882,7 +896,7 @@
         }
         const thead = '<thead><tr>' + headerCells.map(c => `<th>${formatInline(escapeHtml(c))}</th>`).join('') + '</tr></thead>';
         const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${formatInline(escapeHtml(c))}</td>`).join('') + '</tr>').join('') + '</tbody>';
-        out.push(`<table class="fb-md-table">${thead}${tbody}</table>`);
+        out.push(`<div class="fb-md-table-wrap"><table class="fb-md-table">${thead}${tbody}</table></div>`);
         continue;
       }
       // unordered list
