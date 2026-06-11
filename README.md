@@ -1,7 +1,7 @@
 # FD Platform Prototype
 
 A simplified demo prototype for an FD booking platform.
-
+  
 ## Features
 - Mobile-responsive UI using plain HTML/JS/CSS.
 - Simple OTP-less login flow for demo purposes (OTP is hardcoded to `123456`).
