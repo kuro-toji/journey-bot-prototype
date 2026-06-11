@@ -608,9 +608,17 @@
         false, 'fb-msg-meta'
       );
     }
-    appendChips([
+    // Build the follow-up chip row. On success, also include a
+    // relevant FAQ fallback chip if the user's text had a
+    // recognizable keyword. This way even when the LLM answers
+    // (or refuses) successfully, the user gets a one-click path
+    // to the relevant FAQ.
+    const followUpChips = [
       { intent: 'main_menu', label: '← Main menu' },
-    ]);
+    ];
+    const fallback = llmFallbackChip(text);
+    if (fallback) followUpChips.push(fallback);
+    appendChips(followUpChips);
   }
 
   function llmErrorToText(reason) {
