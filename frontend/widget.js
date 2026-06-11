@@ -669,6 +669,19 @@
         `_(forwarded from FAQ: ${r.forwardedFromFaq.label})_`,
         false, 'fb-msg-meta'
       );
+    } else if (r.forwardedFromFlow) {
+      // The server matched a 'my fd' / 'my deposits' pattern and
+      // returned the verify-flow prompt instead of hitting the LLM.
+      // Show a badge + the 'Verify identity' chip so the user
+      // can immediately start the verify flow.
+      appendMessage('bot',
+        `_(routed to: ${r.forwardedFromFlow.label})_`,
+        false, 'fb-msg-meta'
+      );
+      appendChips([
+        { intent: 'verify_start', label: 'Verify identity' },
+        { intent: 'main_menu', label: '← Main menu' },
+      ]);
     }
     // Append usage footer if present
     if (r.usage && r.usage.total_tokens) {

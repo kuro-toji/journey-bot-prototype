@@ -273,6 +273,8 @@ const FAQ_TRIGGERS = {
     'what is a fixed deposit', 'what is an fd', 'what are fds',
     'fixed deposit meaning', 'fd meaning', 'define fd',
     'what does fd mean', 'tell me about fd',
+    'about fd', 'about fixed deposit', 'know about fd',
+    'learn about fd', 'fd info', 'fd basics', 'fd introduction',
   ],
   fd_details: [
     'fd details', 'fd types', 'types of fd', 'fd tenure',
@@ -285,6 +287,16 @@ const FAQ_TRIGGERS = {
   premature_withdrawal: [
     'premature withdrawal', 'early withdrawal', 'withdraw fd',
     'break fd', 'fd before maturity', 'premature',
+  ],
+  // Personal data: when the user's text mentions 'my fd' or
+  // 'my fixed deposit' or 'my deposits', forward to the verify
+  // flow (which prompts for phone + DOB + PAN). The matchFaq
+  // function returns a special {kind:'flow', text, followUps}
+  // object for these instead of a FAQ entry.
+  check_my_fds: [
+    'my fd', 'my fixed deposit', 'my fds', 'my fixed deposits',
+    'my deposit', 'my deposits', 'my booking', 'my bookings',
+    'show my fd', 'list my fd', 'see my fd', 'view my fd',
   ],
   cumulative_vs_non_cumulative: [
     'cumulative vs non', 'cumulative', 'non-cumulative', 'non cumulative',
@@ -349,13 +361,39 @@ const FAQ_MATCH_THRESHOLD = 4;
 function matchFaq(userText) {
   if (!userText || typeof userText !== 'string') return { faq: null, score: 0 };
   const t = userText.toLowerCase();
+
+  // First: personal data — 'my fd' / 'my deposits' should route
+  // to the verify flow. Return a special 'flow' object that
+  // routes/bot.js will forward to the check_my_fds handler.
+  const personalTriggers = FAQ_TRIGGERS.check_my_fds || [];
+  let personalScore = 0;
+  for (const trig of personalTriggers) {
+    if (t.includes(trig)) personalScore += trig.length;
+  }
+  if (personalScore >= 4) {
+    return {
+      faq: null,
+      flow: {
+        id: 'check_my_fds',
+        label: 'Check my FDs',
+        text:
+          "To check your FDs anonymously, I need to verify you with three details. " +
+          "Please enter them in this exact format:\n\n" +
+          "1. Mobile number: 10 digits, no spaces (e.g. 9714503400)\n" +
+          "2. Date of birth: YYYY-MM-DD (e.g. 1990-01-15)\n" +
+          "3. PAN: AAAAA9999A (e.g. ABCDE1234F)",
+        followUps: ['verify_start'],
+      },
+      score: personalScore,
+    };
+  }
+
+  // Second: FAQ keyword triggers (curated FAQ answers).
   let best = null;
   let bestScore = 0;
   for (const key of Object.keys(FAQ_TRIGGERS)) {
+    if (key === 'check_my_fds') continue; // handled above
     let score = 0;
-    // The FAQ's own label is its strongest signal; give it a 1.5x
-    // weight so direct matches like 'what is dicgc' beat incidental
-    // keyword overlap with other FAQs.
     const faq = FAQ[key];
     if (faq && faq.label) {
       const label = faq.label.toLowerCase();

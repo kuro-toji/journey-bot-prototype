@@ -221,6 +221,20 @@ router.post('/llm', async (req, res) => {
       forwardedFromFaq: { id: match.faq.id, label: match.faq.label, score: match.score },
     });
   }
+  if (match.flow) {
+    // Personal data: forward to the verify flow (or the cached
+    // personalized 'my FDs' actions for authed users). The widget
+    // gets the prompt text + a 'verify_start' chip.
+    logAnonQuestion({ intent: match.flow.id, audience: 'flow-forward', ip: req.ip });
+    return res.json({
+      text: match.flow.text,
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      toolsUsed: [],
+      remaining: r.remaining,
+      limit: r.limit,
+      forwardedFromFlow: { id: match.flow.id, label: match.flow.label, score: match.score },
+    });
+  }
 
   // Every tool handler is wrapped with a context that carries the
   // verified userId. The LLM cannot pass a userId into a tool
