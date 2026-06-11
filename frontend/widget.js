@@ -586,22 +586,40 @@
     }
 
     appendMessage('bot', r.text || '(no reply)');
-    // Append usage footer if present
-    if (r.usage && r.usage.total_tokens) {
-      const toolsBit = (r.toolsUsed && r.toolsUsed.length)
-        ? ` · used ${r.toolsUsed.join(', ')}`
-        : '';
-      const remainingBit = (r.remaining != null)
-        ? ` · ${r.remaining} of ${r.limit} messages left this hour`
-        : '';
+    // If the server forwarded to a FAQ (no LLM call), show a
+    // small badge so the user understands the answer came from
+    // the curated FAQ list, not the AI.
+    if (r.forwardedFromFaq) {
       appendMessage('bot',
-        `_(tokens: ${r.usage.total_tokens}${toolsBit}${remainingBit})_`,
+        `_(forwarded from FAQ: ${r.forwardedFromFaq.label})_`,
         false, 'fb-msg-meta'
       );
+    } else if (r.forwardedFromFlow) {
+      // The server matched a 'my fd' / 'my deposits' pattern and
+      // returned the verify-flow prompt instead of hitting the LLM.
+      // Show a badge + the 'Verify identity' chip so the user
+      // can immediately start the verify flow.
+      appendMessage('bot',
+        `_(routed to: ${r.forwardedFromFlow.label})_`,
+        false, 'fb-msg-meta'
+      );
+      appendChips([
+        { intent: 'verify_start', label: 'Verify identity' },
+        { intent: 'main_menu', label: '← Main menu' },
+      ]);
     }
-    appendChips([
+
+    // Build the follow-up chip row. On success, also include a
+    // relevant FAQ fallback chip if the user's text had a
+    // recognizable keyword. This way even when the LLM answers
+    // (or refuses) successfully, the user gets a one-click path
+    // to the relevant FAQ.
+    const followUpChips = [
       { intent: 'main_menu', label: '← Main menu' },
-    ]);
+    ];
+    const fallback = llmFallbackChip(text);
+    if (fallback) followUpChips.push(fallback);
+    appendChips(followUpChips);
   }
 
   function llmErrorToText(reason) {

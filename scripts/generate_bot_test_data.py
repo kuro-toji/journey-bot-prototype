@@ -45,7 +45,14 @@ def main():
         FROM "user"
        ORDER BY mobile_number
     """
-    env = {**os.environ, 'PGHOST': '/tmp/pgsock', 'PGPORT': '5433', 'PGUSER': 'suman', 'PGDATABASE': 'blostem'}
+    env = {
+        **os.environ,
+        'PGHOST': os.environ.get('PGHOST', 'localhost'),
+        'PGPORT': os.environ.get('PGPORT', '5432'),
+        'PGUSER': os.environ.get('PGUSER', 'postgres'),
+        'PGPASSWORD': os.environ.get('PGPASSWORD', '12345678'),
+        'PGDATABASE': os.environ.get('PGDATABASE', 'blostem')
+    }
     out = subprocess.check_output(['psql', '-t', '-A', '-F', '|', '-c', sql], env=env).decode()
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', newline='') as fh:
