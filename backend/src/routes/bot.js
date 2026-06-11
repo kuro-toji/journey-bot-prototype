@@ -222,9 +222,32 @@ router.post('/llm', async (req, res) => {
     });
   }
   if (match.flow) {
-    // Personal data: forward to the verify flow (or the cached
-    // personalized 'my FDs' actions for authed users). The widget
-    // gets the prompt text + a 'verify_start' chip.
+    // The user typed something that reads as 'my fd' / 'my
+    // deposits' / 'show my fds'. For ANON viewers, the right
+    // response is the verify prompt (phone + DOB + PAN). For
+    // AUTHED viewers, the right response is the actual data
+    // from the cache (or self-healed from the DB).
+    if (isAuthed) {
+      // Authed: skip the verify step. Route to the personalized
+      // 'my active FDs' handler. It uses the self-healing cache
+      // (see commit 69cbcdf), so a cold cache after a server
+      // restart is fine.
+      const personalized = await dispatch('my_active_fds', req);
+      logAnonQuestion({ intent: 'my_active_fds', audience: 'auth-flow-forward', ip: req.ip });
+      return res.json({
+        text: personalized.text || 'You have no FD bookings yet.',
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        toolsUsed: ['my_active_fds'],
+        remaining: r.remaining,
+        limit: r.limit,
+        forwardedFromAuth: {
+          intent: 'my_active_fds',
+          label: 'Your active FDs',
+          score: match.score,
+        },
+      });
+    }
+    // Anon: forward to the verify flow.
     logAnonQuestion({ intent: match.flow.id, audience: 'flow-forward', ip: req.ip });
     return res.json({
       text: match.flow.text,

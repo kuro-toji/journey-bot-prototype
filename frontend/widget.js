@@ -711,6 +711,16 @@
         { intent: 'verify_start', label: 'Verify identity' },
         { intent: 'main_menu', label: '← Main menu' },
       ]);
+    } else if (r.forwardedFromAuth) {
+      // The server matched a 'my fd' pattern AND the user is
+      // authed, so the response is the user's actual data
+      // (fetched via the self-healing personalized handler).
+      // Show a small badge so the user knows it's their data
+      // and not a generic FAQ answer.
+      appendMessage('bot',
+        `_(routed to: ${r.forwardedFromAuth.label})_`,
+        false, 'fb-msg-meta'
+      );
     }
     // (No usage footer / tokens / remaining-counts shown in the UI.
     // The per-call cost guard and rate limit still apply server-side
