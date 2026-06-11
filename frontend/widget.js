@@ -111,7 +111,17 @@
 }
 .fb-msg-user-wrap { display: flex; justify-content: flex-end; }
 
-.fb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fb-chips {
+  display: flex; flex-wrap: wrap;
+  gap: 8px 10px;
+  /* Equal margin above and below so the chip group never
+     'sticks' to the next message or to the previous bot
+     bubble. The 12px matches the gap used between two
+     consecutive .fb-msg bubbles (.fb-msg margin-bottom),
+     so the vertical rhythm of the chat is uniform:
+       msg  <-- 12px -->  chips  <-- 12px -->  msg */
+  margin: 12px 0 12px 0;
+}
 .fb-chip {
   background: #fff; color: #1f2937;
   border: 1px solid #ecad4f; border-radius: 999px;
@@ -622,15 +632,11 @@
    */
   function enterFreeForm() {
     state.freeForm = true;
-    // Clear the previous FAQ chat history so the free-form mode
-    // starts with a clean slate (just the LLM welcome). Without
-    // this, the old FAQ chips and bot replies would be visible
-    // above the AI welcome, which is visually confusing and
-    // makes it look like the assistant is "stitched on" to the
-    // old chat.
-    bodyEl.innerHTML = '';
-    state.labelMap = Object.create(null);
-    state.flowChips = null;
+    // Keep the previous FAQ chat history visible. The user can
+    // still scroll up to see it, and the '← Main menu' chip at
+    // the end of each bot reply is the back button. Clearing the
+    // history (as we did previously) made the user feel locked
+    // into AI mode with no way back.
     setHint('AI mode — ask about FDs or rates. The model will not entertain off-topic questions.');
     setInputVisible(true, 'Ask about FDs, rates, or comparison…', submitLlmQuestion);
     appendMessage('bot',
