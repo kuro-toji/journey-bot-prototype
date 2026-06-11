@@ -3,9 +3,11 @@
 The `journey` table is the heart of the platform: one row per FD
 booking. It holds the booking receipt, the rate snapshot at the
 time of booking, the KYC + payment + lifecycle timestamps, and
-the Phase E extras (branch, IFSC, settlement id, etc.).
+the FD receipt details (branch, IFSC, settlement id, etc.).
 
 Below: every column, its type, and where the value comes from.
+The columns are grouped by purpose — what the data IS, not when
+it was added.
 
 ---
 
@@ -23,13 +25,13 @@ Below: every column, its type, and where the value comes from.
 | `user_id` | `BIGINT` NOT NULL | `REFERENCES "user"(user_id)`. Set from the JWT of the logged-in user at booking time. |
 | `rate_id` | `BIGINT` NOT NULL | `REFERENCES master(rate_id)`. The rate row that was picked at booking time. All rate-snapshot columns below are denormalized from this row. |
 
-## 3. Rate snapshot (6 fields, frozen at booking)
+## 3. Rate at booking (6 fields, frozen snapshot)
 
 | Field | Type | Source |
 |---|---|---|
 | `tenure_months` | `SMALLINT` NOT NULL | `rate.tenure_months` (12 / 24 / 36). |
 | `tenure_days` | `INTEGER` NOT NULL | `rate.tenure_days` (360 / 720 / 1080). |
-| `interest_rate_bps` | `SMALLINT` NOT NULL | The customer's GENERAL rate (`rate.interest_rate_bps`), regardless of `customer_type`. For senior citizens, the actual rate is in `senior_citizen_rate_bps` (Phase E). |
+| `interest_rate_bps` | `SMALLINT` NOT NULL | The customer's GENERAL rate (`rate.interest_rate_bps`), regardless of `customer_type`. For senior citizens, the actual rate they get is in `senior_citizen_rate_bps` (group 10). |
 | `customer_type` | `TEXT` NOT NULL | `general` or `senior_citizen`, from the booking request body. Defaults to `general`. |
 | `compounding` | `compounding_enum` NOT NULL | `rate.compounding` (`quarterly` etc.). |
 | `payout_type` | `payout_type_enum` NOT NULL | `rate.payout_type` (`cumulative` / `non_cumulative`). |
@@ -42,7 +44,7 @@ Below: every column, its type, and where the value comes from.
 | `maturity_amount` | `NUMERIC(12,2)` NOT NULL | Computed at insert: `principal * (1 + rate/100)^(tenure_days/365)` (compounded quarterly). Must be `>= principal`. |
 | `interest_earned` | `NUMERIC(12,2)` GENERATED | `GENERATED ALWAYS AS (maturity_amount - principal) STORED`. Postgres-computed; never written. |
 
-## 5. Dates (2 fields)
+## 5. Calendar (2 fields)
 
 | Field | Type | Source |
 |---|---|---|
@@ -60,9 +62,9 @@ Below: every column, its type, and where the value comes from.
 | Field | Type | Source |
 |---|---|---|
 | `nominee_name` | `TEXT` | Optional. From the booking request body. |
-| `nominee_relationship` | `nominee_relationship_enum` | Optional. From the booking request body. CHECK: if `nominee_name` is set, this should be set too (enforced at app level). |
+| `nominee_relationship` | `nominee_relationship_enum` | Optional. From the booking request body. CHECK (at app level): if `nominee_name` is set, this should be set too. |
 
-## 8. KYC + VKYC + Payment + Lifecycle (8 timestamps)
+## 8. KYC + VKYC timestamps (4 fields)
 
 | Field | Type | Source |
 |---|---|---|
@@ -70,17 +72,26 @@ Below: every column, its type, and where the value comes from.
 | `aadhaar_ekyc_at` | `TIMESTAMPTZ` NOT NULL | Auto-set to `NOW()`. Aadhaar eKYC completion time. CHECK: `>= pan_verified_at`. |
 | `vkyc_scheduled_at` | `TIMESTAMPTZ` | NULL if VKYC not required (e.g. small principal, or Aadhaar eKYC used). Set when VKYC is scheduled. CHECK: `>= aadhaar_ekyc_at` if set. |
 | `vkyc_completed_at` | `TIMESTAMPTZ` | NULL if VKYC not required. Set when the video call completes. CHECK: `>= vkyc_scheduled_at` if set. |
+
+## 9. Payment + FD lifecycle timestamps (5 fields)
+
+| Field | Type | Source |
+|---|---|---|
 | `payment_initiated_at` | `TIMESTAMPTZ` NOT NULL | Auto-set to `NOW()`. CHECK: `>= COALESCE(vkyc_completed_at, aadhaar_ekyc_at)`. |
 | `payment_completed_at` | `TIMESTAMPTZ` NOT NULL | Auto-set to `NOW()`. CHECK: `>= payment_initiated_at`. |
 | `fd_activated_at` | `TIMESTAMPTZ` | NULL until the FD is actually opened at the bank. CHECK: `>= payment_completed_at` if set. |
 | `fd_matured_at` | `TIMESTAMPTZ` | NULL until the FD reaches `maturity_date`. CHECK: `>= fd_activated_at` if set. |
 | `fd_withdrawn_at` | `TIMESTAMPTZ` | NULL until the user withdraws (or auto-renews). CHECK: `>= fd_activated_at` if set. |
 
-## 9. Phase E — Extra booking response fields (9 fields, added in commit `e24b8fd`)
+## 10. FD receipt details (9 fields)
+
+These are the fields a real Indian bank's booking receipt / FD
+passbook returns in addition to the basics. They make the journey
+row a complete snapshot of the booking, not just a reference to it.
 
 | Field | Type | Source |
 |---|---|---|
-| `senior_citizen_rate_bps` | `SMALLINT` | The rate the customer ACTUALLY gets. For `senior_citizen` customers: `rate.senior_citizen_rate_bps`. For general: `rate.interest_rate_bps` (same as `interest_rate_bps`). Denormalized from `master` so the booking is a complete snapshot. |
+| `senior_citizen_rate_bps` | `SMALLINT` | The rate the customer ACTUALLY gets. For `senior_citizen` customers: `rate.senior_citizen_rate_bps`. For general: same as `interest_rate_bps`. Denormalized from `master` so the booking is a complete snapshot. |
 | `effective_date` | `DATE` | When interest starts accruing. For this demo: same as `booking_date` (T+0 settlement). For non-cumulative FDs in real life this could be `booking_date + 1`. |
 | `customer_reference` | `TEXT` | Optional customer-side reference number (the user can set this in the booking form for their own tracking). |
 | `branch_code` | `TEXT` | The branch that holds the FD. Fictional: `MUM-ANDH-001` (Maro), `BLR-IND-001` (Sunset), `DEL-CON-001` (Nomnom), `MUM-BKC-001` (Ion), `CHE-SHO-001` (Mute). Real system: bank's branch code. |
@@ -90,7 +101,7 @@ Below: every column, its type, and where the value comes from.
 | `interest_payout_frequency` | `TEXT` | For `payout_type = 'cumulative'`: `at_maturity`. For `non_cumulative`: `monthly`. (Could also be `quarterly` if the bank supports it; not used in this demo.) |
 | `tax_slab` | `TEXT` | Approximate personal-income tax bracket based on the principal alone (educational only; real tax depends on total income). Brackets: `< Rs 1L` → `0%`, `< Rs 5L` → `5%`, `< Rs 10L` → `20%`, `>= Rs 10L` → `30%`. |
 
-## 10. Audit (2 fields)
+## 11. Audit (2 fields)
 
 | Field | Type | Source |
 |---|---|---|
@@ -99,17 +110,20 @@ Below: every column, its type, and where the value comes from.
 
 ---
 
-## Summary count
+## Group summary (38 columns total)
 
-- Public IDs: 2
-- Foreign keys: 2
-- Rate snapshot: 6
-- Money: 3
-- Dates: 2
-- State: 1
-- Nominee: 2
-- KYC + VKYC + Payment + Lifecycle: 9
-- Phase E extras: 9
-- Audit: 2
+| # | Group | Fields |
+|---|---|---|
+| 1 | Public IDs | 2 |
+| 2 | Foreign keys | 2 |
+| 3 | Rate at booking | 6 |
+| 4 | Money | 3 |
+| 5 | Calendar | 2 |
+| 6 | State | 1 |
+| 7 | Nominee | 2 |
+| 8 | KYC + VKYC timestamps | 4 |
+| 9 | Payment + FD lifecycle timestamps | 5 |
+| 10 | FD receipt details | 9 |
+| 11 | Audit | 2 |
 
-**Total: 38 columns.** All but the audit + lifecycle timestamps are sourced from either the booking request, the `master` rate row, or derived values.
+**Total: 38 columns.** All but the audit + lifecycle timestamps are sourced from either the booking request body, the `master` rate row, or derived values.
