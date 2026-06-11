@@ -100,7 +100,7 @@ router.get('/menu', (req, res) => {
   res.json({ menu: menuForViewer(isAuthed) });
 });
 
-router.post('/ask', (req, res) => {
+router.post('/ask', async (req, res) => {
   const intent = req.body && req.body.intent;
   if (!intent) return res.status(400).json({ error: 'intent_required' });
   if (req.user) {
@@ -108,7 +108,13 @@ router.post('/ask', (req, res) => {
   } else {
     logAnonQuestion({ intent, audience: 'anon', ip: req.ip });
   }
-  res.json(dispatch(intent, req));
+  try {
+    const out = await dispatch(intent, req);
+    res.json(out);
+  } catch (e) {
+    console.error('/ask error', e);
+    res.status(500).json({ type: 'error', text: 'Internal error. Please try again.', followUps: withMainMenu(['faq_fd_definition']) });
+  }
 });
 
 router.post('/verify', verifyLimiter, async (req, res) => {

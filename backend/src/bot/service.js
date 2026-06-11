@@ -181,37 +181,65 @@ function handleMyTotalValue(identity) {
   return { type: 'data', text: lines.join('\n'), followUps: withMainMenu(['my_active_fds', 'my_maturity', 'my_biggest_fd', 'check_my_fds']) };
 }
 
+/**
+ * Self-healing cache: if the in-memory cache is cold (e.g. the
+ * backend was restarted, or the TTL expired), fetch the user's
+ * bookings from the DB and warm the cache. This means personalised
+ * queries like 'show my FDs' always work for a logged-in user
+ * even after a server restart, without them having to re-login.
+ */
+async function getBookingsForUser(userId) {
+  if (!userId) return null;
+  const cached = getCache(userId);
+  if (cached && cached.bookings) return cached.bookings;
+  const { query } = require('../config/db');
+  const r = await query(
+    `SELECT j.booking_id, j.bank_reference_id, m.bank_code, m.bank_name,
+            j.tenure_months, j.interest_rate_bps, j.customer_type,
+            j.principal, j.maturity_amount, j.booking_date, j.maturity_date, j.state
+       FROM journey j
+       JOIN master m ON j.rate_id = m.rate_id
+      WHERE j.user_id = $1
+      ORDER BY j.booking_date DESC
+      LIMIT 50`,
+    [userId]
+  );
+  const bookings = r.rows;
+  if (bookings.length) setCache(userId, { bookings });
+  return bookings;
+}
+
 function handleMyMaturity(identity) {
   if (identity.kind === 'anon') {
     return { type: 'flow', text: 'Please verify your identity first.', followUps: withMainMenu(['check_my_fds']) };
   }
-  const cached = getCache(identity.userId);
-  const bookings = cached && cached.bookings ? cached.bookings : null;
-  if (!bookings) return { type: 'error', text: 'Bookings not loaded.' };
-  const s = computeSummary(bookings);
-  if (!s.next) return { type: 'data', text: 'You have no active FDs maturing in the future.', followUps: withMainMenu(['my_active_fds', 'check_my_fds']) };
-  return {
-    type: 'data',
-    text: `Your next maturity:\n  - ${s.next.bank} on ${formatDate(s.next.date)} → ${formatRupee(s.next.amount)}\n    Ref: ${s.next.ref}`,
-    followUps: withMainMenu(['my_active_fds', 'my_total_value', 'my_biggest_fd', 'check_my_fds']),
-  };
+  return getBookingsForUser(identity.userId).then(bookings => {
+    if (!bookings) return { type: 'error', text: 'Bookings not loaded.' };
+    const s = computeSummary(bookings);
+    if (!s.next) return { type: 'data', text: 'You have no active FDs maturing in the future.', followUps: withMainMenu(['my_active_fds', 'check_my_fds']) };
+    return {
+      type: 'data',
+      text: `Your next maturity:\n  - ${s.next.bank} on ${formatDate(s.next.date)} → ${formatRupee(s.next.amount)}\n    Ref: ${s.next.ref}`,
+      followUps: withMainMenu(['my_active_fds', 'my_total_value', 'my_biggest_fd', 'check_my_fds']),
+    };
+  });
 }
 
 function handleMyBiggestFd(identity) {
   if (identity.kind === 'anon') {
     return { type: 'flow', text: 'Please verify your identity first.', followUps: withMainMenu(['check_my_fds']) };
   }
-  const cached = getCache(identity.userId);
-  const bookings = cached && cached.bookings ? cached.bookings : null;
-  if (!bookings) return { type: 'error', text: 'Bookings not loaded.' };
-  const active = bookings.filter(b => b.state === 'fd_active');
-  if (!active.length) return { type: 'data', text: 'No active FDs.', followUps: withMainMenu(['my_active_fds', 'check_my_fds']) };
-  const biggest = active.slice().sort((a, b) => Number(b.principal) - Number(a.principal))[0];
-  return {
-    type: 'data',
-    text: `Your biggest active FD:\n  ${biggest.bank_name} — ${formatRupee(biggest.principal)} @ ${(biggest.interest_rate_bps / 100).toFixed(2)}%\n  Ref: ${biggest.bank_reference_id}\n  Matures: ${formatDate(biggest.maturity_date)} → ${formatRupee(biggest.maturity_amount)}`,
-    followUps: withMainMenu(['my_active_fds', 'my_total_value', 'my_maturity', 'check_my_fds']),
-  };
+  return getBookingsForUser(identity.userId).then(bookings => {
+    if (!bookings) return { type: 'error', text: 'Bookings not loaded.' };
+    const active = bookings.filter(b => b.state === 'fd_active');
+    if (!active.length) return { type: 'data', text: 'No active FDs.', followUps: withMainMenu(['my_active_fds', 'check_my_fds']) };
+    const biggest = active.slice().sort((a, b) => Number(b.principal) - Number(a.principal))[0];
+    return {
+      type: 'data',
+      text: `Your biggest active FD:\n  ${biggest.bank_name} — ${formatRupee(biggest.principal)} @ ${(biggest.interest_rate_bps / 100).toFixed(2)}%\n  Ref: ${biggest.bank_reference_id}\n  Matures: ${formatDate(biggest.maturity_date)} → ${formatRupee(biggest.maturity_amount)}`,
+      followUps: withMainMenu(['my_active_fds', 'my_total_value', 'my_maturity', 'check_my_fds']),
+    };
+  });
 }
 
 function handleHowToBook(identity) {
@@ -244,16 +272,15 @@ const handlers = {
 function dispatch(intent, req) {
   let fn = handlers[intent];
   if (!fn && typeof intent === 'string' && intent.startsWith('faq_')) {
-    // Safety net: any faq_* intent that exists in the FAQ module
-    // is auto-handled. Avoids the 'I do not know that one yet'
-    // failure mode when a new FAQ entry is added but the handler
-    // map in this file is forgotten.
     const faqKey = intent.slice(4);
     if (FAQ[faqKey]) fn = makeFaqHandler(faqKey);
   }
   if (!fn) return { type: 'error', text: 'I do not know that one yet.', followUps: withMainMenu(['faq_fd_definition']) };
   const identity = resolveIdentity(req);
-  return fn(identity, (req.body && req.body.params) || {});
+  // Some handlers (self-healing cache, async DB queries) return a
+  // Promise. Coerce to a Promise so the route handler can await
+  // the result regardless of whether the handler was sync or async.
+  return Promise.resolve(fn(identity, (req.body && req.body.params) || {}));
 }
 
 function menuForViewer(isAuthed) {
