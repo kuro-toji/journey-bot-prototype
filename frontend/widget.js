@@ -66,9 +66,15 @@
 }
 .fb-avatar {
   width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid #ecad4f;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+}
+.fb-avatar-inner {
+  width: 22px; height: 22px; border-radius: 50%;
   background: #ecad4f; color: #1f2937;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 14px;
+  font-weight: 700; font-size: 12px;
 }
 .fb-title { font-size: 15px; font-weight: 600; flex: 1; }
 .fb-sub { font-size: 11px; color: #d1d5db; }
@@ -105,7 +111,17 @@
 }
 .fb-msg-user-wrap { display: flex; justify-content: flex-end; }
 
-.fb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fb-chips {
+  display: flex; flex-wrap: wrap;
+  gap: 8px 10px;
+  /* Equal margin above and below so the chip group never
+     'sticks' to the next message or to the previous bot
+     bubble. The 12px matches the gap used between two
+     consecutive .fb-msg bubbles (.fb-msg margin-bottom),
+     so the vertical rhythm of the chat is uniform:
+       msg  <-- 12px -->  chips  <-- 12px -->  msg */
+  margin: 12px 0 12px 0;
+}
 .fb-chip {
   background: #fff; color: #1f2937;
   border: 1px solid #ecad4f; border-radius: 999px;
@@ -170,21 +186,35 @@
   line-height: 1.4;
 }
 .fb-md-pre code { color: inherit; background: transparent; padding: 0; }
-.fb-md-table {
-  width: 100%;
-  border-collapse: collapse;
+.fb-md-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin: 6px 0;
-  font-size: 12.5px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+.fb-md-table {
+  border-collapse: collapse;
+  font-size: 11.5px;
+  min-width: 100%;
+  white-space: nowrap;
 }
 .fb-md-table th, .fb-md-table td {
-  border: 1px solid #e5e7eb;
-  padding: 6px 8px;
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 10px;
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
 }
 .fb-md-table th {
   background: #f9fafb;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.fb-md-table tr:last-child td {
+  border-bottom: none;
 }
 .fb-md-hr { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
 .fb-md-quote {
@@ -336,7 +366,11 @@
     panel = el('div', { class: 'fb-panel', 'aria-hidden': 'true' });
 
     const header = el('div', { class: 'fb-header' }, [
-      el('div', { class: 'fb-avatar' }, ['F']),
+      el('div', { class: 'fb-avatar' }, [
+        el('span', { class: 'fb-avatar-inner' }, [state.branding && state.branding.bot && state.branding.bot.avatar_text
+          ? state.branding.bot.avatar_text
+          : 'F']),
+      ]),
       el('div', { style: { flex: '1' } }, [
         el('div', { class: 'fb-title' }, ['FinBot']),
         el('div', { class: 'fb-sub' }, ['FD assistant — ask me anything']),
@@ -508,6 +542,8 @@
     appendMessage('bot', r.text);
     appendChips(r.followUps);
     state.flowChips = r.followUps;
+    // re-enable all chips so the user can keep clicking
+    shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
   }
 
   /* ---------- verify flow ---------- */
@@ -581,6 +617,7 @@
     appendMessage('bot', askData.text);
     appendChips(askData.followUps);
     state.flowChips = askData.followUps;
+    shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
   }
 
   async function onSubmitInput() {
@@ -609,6 +646,11 @@
    */
   function enterFreeForm() {
     state.freeForm = true;
+    // Keep the previous FAQ chat history visible. The user can
+    // still scroll up to see it, and the '← Main menu' chip at
+    // the end of each bot reply is the back button. Clearing the
+    // history (as we did previously) made the user feel locked
+    // into AI mode with no way back.
     setHint('AI mode — ask about FDs or rates. The model will not entertain off-topic questions.');
     setInputVisible(true, 'Ask about FDs, rates, or comparison…', submitLlmQuestion);
     appendMessage('bot',
@@ -657,6 +699,7 @@
       ];
       if (fallback) chips.push(fallback);
       appendChips(chips);
+      shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
       return;
     }
 
@@ -682,6 +725,16 @@
         { intent: 'verify_start', label: 'Verify identity' },
         { intent: 'main_menu', label: '← Main menu' },
       ]);
+    } else if (r.forwardedFromAuth) {
+      // The server matched a 'my fd' pattern AND the user is
+      // authed, so the response is the user's actual data
+      // (fetched via the self-healing personalized handler).
+      // Show a small badge so the user knows it's their data
+      // and not a generic FAQ answer.
+      appendMessage('bot',
+        `_(routed to: ${r.forwardedFromAuth.label})_`,
+        false, 'fb-msg-meta'
+      );
     }
     // Build the follow-up chip row. On success, also include a
     // relevant FAQ fallback chip if the user's text had a
@@ -694,6 +747,8 @@
     const fallback = llmFallbackChip(text);
     if (fallback) followUpChips.push(fallback);
     appendChips(followUpChips);
+    // re-enable all chips so the user can keep clicking
+    shadow.querySelectorAll('.fb-chip').forEach(c => c.disabled = false);
   }
 
   function llmErrorToText(reason) {
@@ -838,7 +893,7 @@
         }
         const thead = '<thead><tr>' + headerCells.map(c => `<th>${formatInline(escapeHtml(c))}</th>`).join('') + '</tr></thead>';
         const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${formatInline(escapeHtml(c))}</td>`).join('') + '</tr>').join('') + '</tbody>';
-        out.push(`<table class="fb-md-table">${thead}${tbody}</table>`);
+        out.push(`<div class="fb-md-table-wrap"><table class="fb-md-table">${thead}${tbody}</table></div>`);
         continue;
       }
       // unordered list

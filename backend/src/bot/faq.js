@@ -283,6 +283,8 @@ const FAQ_TRIGGERS = {
   dicgc: [
     'dicgc', 'dicgc insurance', 'deposit insurance', 'is fd safe',
     'fd insurance', 'insured deposit',
+    // common typos
+    'digc', 'dicsgc', 'digi c', 'deposit insur',
   ],
   premature_withdrawal: [
     'premature withdrawal', 'early withdrawal', 'withdraw fd',
