@@ -29,7 +29,7 @@
   const API = (window.API_BASE || '').replace(/\/+$/, '');
   const STYLE = `
 :host { all: initial; font-family: 'Roboto', system-ui, -apple-system, sans-serif; color: #1f2937; }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; font-family: 'Roboto', system-ui, -apple-system, sans-serif; }
 
 /* --- launcher --- */
 .fb-launcher {
