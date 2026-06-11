@@ -46,7 +46,7 @@ async function handleBook(event) {
 
   try {
     const payload = {
-      rateId: parseInt(currentRateId, 10),
+      rateId: currentRateId,
       principal: parseFloat(principal),
       customerType: 'general'
     };
