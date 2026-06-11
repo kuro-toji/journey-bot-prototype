@@ -97,14 +97,16 @@ function renderBookingsList(bookings) {
   if (!bookings.length) return 'You have no FD bookings yet.';
   // Render as a markdown table so the widget's scrollable-table
   // wrapper (overflow-x: auto) can handle wide columns gracefully.
+  // Columns include the new Phase E booking fields.
   const lines = [
-    '| # | Bank | Ref | Principal | Rate | Tenure | Maturity |',
-    '|---|------|-----|-----------|------|--------|----------|',
+    '| # | Bank | Ref | Principal | Rate | Tenure | Maturity | Settlement |',
+    '|---|------|-----|-----------|------|--------|----------|------------|',
   ];
   bookings.forEach((b, i) => {
     const rate = (b.interest_rate_bps / 100).toFixed(2) + '%';
     const tenure = b.tenure_months + 'm';
-    lines.push(`| ${i + 1} | ${b.bank_name} | ${b.bank_reference_id} | ${formatRupee(b.principal)} | ${rate} | ${tenure} | ${formatDate(b.maturity_date)} |`);
+    const settlement = b.settlement_id || '—';
+    lines.push(`| ${i + 1} | ${b.bank_name} | ${b.bank_reference_id} | ${formatRupee(b.principal)} | ${rate} | ${tenure} | ${formatDate(b.maturity_date)} | ${settlement} |`);
   });
   return lines.join('\n');
 }
@@ -197,7 +199,10 @@ async function getBookingsForUser(userId) {
   const r = await query(
     `SELECT j.booking_id, j.bank_reference_id, m.bank_code, m.bank_name,
             j.tenure_months, j.interest_rate_bps, j.customer_type,
-            j.principal, j.maturity_amount, j.booking_date, j.maturity_date, j.state
+            j.principal, j.maturity_amount, j.booking_date, j.maturity_date, j.state,
+            j.senior_citizen_rate_bps, j.effective_date, j.customer_reference,
+            j.branch_code, j.ifsc_code, j.settlement_id,
+            j.dicgc_insured, j.interest_payout_frequency, j.tax_slab
        FROM journey j
        JOIN master m ON j.rate_id = m.rate_id
       WHERE j.user_id = $1

@@ -50,6 +50,27 @@ router.post('/book', authRequired, async (req, res) => {
     const bookingId = generateId('bk_fd_', 5);
     const bankRefId = generateId('REF', 8);
 
+    // Derive the extra Phase E booking response fields.
+    const bookingDateStr = today.toISOString().slice(0, 10);
+    const settlementId = `STL${bookingDateStr.replace(/-/g, '')}${Date.now().toString().slice(-6)}`;
+    const branchCode = (
+      { MARO: 'MUM-ANDH-001', SUNE: 'BLR-IND-001', NOMN: 'DEL-CON-001',
+        IONB: 'MUM-BKC-001', MUTE: 'CHE-SHO-001' }[rate.bank_code] || 'GEN-001'
+    );
+    const ifscCode = `${rate.bank_code}0${Math.floor(Math.random() * 9 + 1).toString().padStart(6, '0')}`;
+    const seniorRateBps = customerType === 'senior_citizen' ? rate.senior_citizen_rate_bps : rateBps;
+    const payFreq = rate.payout_type === 'cumulative' ? 'at_maturity' : 'monthly';
+    const taxSlab = principal <  100000 ? '0%'
+                   : principal <  500000 ? '5%'
+                   : principal < 1000000 ? '20%'
+                   :                       '30%';
+    // Effective date = booking date for cumulative FDs; for
+    // non-cumulative FDs interest starts accruing the same day
+    // (T+0 settlement). Kept equal to booking_date for this demo.
+    const effectiveDate = bookingDateStr;
+    // NBFC (Mute) is the only bank without DICGC insurance.
+    const dicgcInsured = rate.dicgc_insured;
+
     // 3. Insert journey row
     const insertSql = `
       INSERT INTO journey (
@@ -58,14 +79,20 @@ router.post('/book', authRequired, async (req, res) => {
         compounding, payout_type, principal, maturity_amount,
         booking_date, maturity_date, state,
         nominee_name, nominee_relationship,
-        pan_verified_at, aadhaar_ekyc_at, payment_initiated_at, payment_completed_at, fd_activated_at
+        pan_verified_at, aadhaar_ekyc_at, payment_initiated_at, payment_completed_at, fd_activated_at,
+        senior_citizen_rate_bps, effective_date, customer_reference,
+        branch_code, ifsc_code, settlement_id,
+        dicgc_insured, interest_payout_frequency, tax_slab
       ) VALUES (
         $1, $2, $3, $4,
         $5, $6, $7, $8,
         $9, $10, $11, $12,
         $13, $14, 'fd_active',
         $15, $16,
-        NOW(), NOW(), NOW(), NOW(), NOW()
+        NOW(), NOW(), NOW(), NOW(), NOW(),
+        $17, $18, NULL,
+        $19, $20, $21,
+        $22, $23, $24
       ) RETURNING *
     `;
 
@@ -73,8 +100,12 @@ router.post('/book', authRequired, async (req, res) => {
       bookingId, bankRefId, userId, rateId,
       rate.tenure_months, rate.tenure_days, rateBps, customerType,
       rate.compounding, rate.payout_type, principal, maturityAmount,
-      today.toISOString().slice(0, 10), maturityDate.toISOString().slice(0, 10),
-      nomineeName || null, nomineeRelationship || null
+      bookingDateStr, maturityDate.toISOString().slice(0, 10),
+      nomineeName || null, nomineeRelationship || null,
+      // Phase E fields:
+      seniorRateBps, effectiveDate,
+      branchCode, ifscCode, settlementId,
+      dicgcInsured, payFreq, taxSlab,
     ];
 
     const result = await query(insertSql, params);
