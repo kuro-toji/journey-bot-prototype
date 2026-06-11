@@ -50,7 +50,7 @@ const FAQ = {
       "that insures your bank deposits. Coverage: up to Rs 5,00,000 per depositor per bank. " +
       "This covers both principal and interest. It applies to all commercial banks and " +
       "most cooperative banks. Note: NBFC fixed deposits (like Shriram) are NOT covered by DICGC.",
-    followUps: ['faq_fd_definition', 'faq_premature_withdrawal'],
+    followUps: ['faq_fd_definition', 'faq_premature_withdrawal', 'faq_min_amount'],
   },
   cumulative_vs_non_cumulative: {
     id: 'cumulative_vs_non_cumulative',
@@ -91,7 +91,7 @@ const FAQ = {
       "• Form 26AS / AIS shows the TDS credit — claim it while filing ITR\n" +
       "• Regular FDs do NOT qualify for 80C deduction. Only 5-year Tax-Saver FDs do, " +
       "and they have a lock-in with no premature withdrawal.",
-    followUps: ['faq_senior_citizen', 'faq_premature_withdrawal'],
+    followUps: ['faq_senior_citizen', 'faq_premature_withdrawal', 'faq_compounding'],
   },
   senior_citizen: {
     id: 'senior_citizen',
@@ -119,6 +119,22 @@ const FAQ = {
       "Maximum amounts go up to Rs 1 crore for banks and Rs 50 lakh for the NBFC. " +
       "Each rate card shows the exact min/max for that bank.",
     followUps: ['faq_fd_details', 'check_my_fds'],
+  },
+  premature_withdrawal: {
+    id: 'premature_withdrawal',
+    intent: 'faq_premature_withdrawal',
+    audience: 'all',
+    label: 'What if I withdraw my FD before maturity?',
+    answer:
+      "Premature withdrawal is allowed at most banks, but the rate is reduced. " +
+      "Typically the bank pays 0.5%-1.0% LESS than the contracted rate for the " +
+      "actual tenure you held the FD. Some specifics:\n\n" +
+      "  - SFBs (Maro, Sunset, Nomnom): usually 0.5% penalty\n" +
+      "  - Commercial banks (Ion): usually 1.0% penalty\n" +
+      "  - NBFCs (Mute Finance): often no penalty (check the loan agreement)\n\n" +
+      "You receive the original principal back; only the interest is reduced. " +
+      "TDS already deducted is not adjusted against your final payout.",
+    followUps: ['faq_dicgc', 'faq_taxation', 'check_my_fds'],
   },
   fd_comparison: {
     id: 'fd_comparison',
@@ -241,6 +257,161 @@ function getFaq(intent) {
 }
 
 /**
+ * Phrase-level triggers for FAQ forwarding. When the user types a
+ * free-form question in 'Talk to assistant' mode, the /api/bot/llm
+ * route calls matchFaq(userText) BEFORE spending an LLM call: if
+ * the user's text strongly matches one of these triggers, the
+ * FAQ's hardcoded answer is returned directly (zero LLM cost, zero
+ * latency). The widget shows a small 'forwarded from FAQ' badge.
+ *
+ * The matching is intentionally simple: lowercased substring check
+ * with a length-weighted score. This is a hand-curated list (14
+ * entries) so we don't need an embedding model for this.
+ */
+const FAQ_TRIGGERS = {
+  fd_definition: [
+    'what is a fixed deposit', 'what is an fd', 'what are fds',
+    'fixed deposit meaning', 'fd meaning', 'define fd',
+    'what does fd mean', 'tell me about fd',
+    'about fd', 'about fixed deposit', 'know about fd',
+    'learn about fd', 'fd info', 'fd basics', 'fd introduction',
+  ],
+  fd_details: [
+    'fd details', 'fd types', 'types of fd', 'fd tenure',
+    'fd options', 'fd amount', 'tenure options',
+  ],
+  dicgc: [
+    'dicgc', 'dicgc insurance', 'deposit insurance', 'is fd safe',
+    'fd insurance', 'insured deposit',
+  ],
+  premature_withdrawal: [
+    'premature withdrawal', 'early withdrawal', 'withdraw fd',
+    'break fd', 'fd before maturity', 'premature',
+  ],
+  // Personal data: when the user's text mentions 'my fd' or
+  // 'my fixed deposit' or 'my deposits', forward to the verify
+  // flow (which prompts for phone + DOB + PAN). The matchFaq
+  // function returns a special {kind:'flow', text, followUps}
+  // object for these instead of a FAQ entry.
+  check_my_fds: [
+    'my fd', 'my fixed deposit', 'my fds', 'my fixed deposits',
+    'my deposit', 'my deposits', 'my booking', 'my bookings',
+    'show my fd', 'list my fd', 'see my fd', 'view my fd',
+  ],
+  cumulative_vs_non_cumulative: [
+    'cumulative vs non', 'cumulative', 'non-cumulative', 'non cumulative',
+    'payout option', 'payout vs cumulative', 'fd payout',
+  ],
+  compounding: [
+    'compounding', 'compound interest', 'how does compounding work',
+    'quarterly compounding', 'compounding frequency',
+  ],
+  taxation: [
+    'tax', 'tds', 'taxation', 'fd tax', 'interest tax',
+    'is fd interest taxable', 'tax on fd',
+  ],
+  senior_citizen: [
+    'senior citizen', 'senior citizens', 'senior', '60+', 'elderly',
+    'old age', 'retiree',
+  ],
+  min_amount: [
+    'minimum amount', 'minimum fd', 'min fd', 'smallest fd',
+    'lowest fd', 'how much can i invest', 'how much to invest',
+  ],
+  fd_comparison: [
+    'compare', 'comparison', 'best rate', 'highest rate',
+    'which bank', 'best fd', 'which is best',
+  ],
+  how_to_book: [
+    'book fd', 'booking fd', 'how to book', 'how do i book',
+    'open fd', 'start fd', 'apply for fd', 'fd process',
+    'how to invest in fd', 'want to book',
+  ],
+  what_is_kyc: [
+    'kyc', 'know your customer', 'what is kyc', 'kyc process',
+    'kyc meaning', 'why kyc',
+  ],
+  aadhaar_ekyc: [
+    'aadhaar', 'aadhar', 'ekyc', 'aadhaar ekyc', 'otp kyc',
+    'aadhaar kyc',
+  ],
+  why_vkyc: [
+    'vkyc', 'video kyc', 'why vkyc', 'video verification',
+    'video call kyc',
+  ],
+  rd_definition: [
+    'recurring deposit', 'rd', 'what is rd', 'monthly deposit',
+  ],
+};
+
+/**
+ * Find the FAQ that best matches the user's free-form text.
+ * Returns { faq, score } or { faq: null, score: bestScore }.
+ *
+ * Scoring: for each FAQ key, sum the lengths of the user's
+ * triggers that appear in the lowercased text. The FAQ with the
+ * highest score wins. We require a minimum total score (DEFAULT
+ * FAQ_MATCH_THRESHOLD chars) to avoid false positives on short
+ * generic text. The FAQ label itself is also added to the trigger
+ * set with a +50% weight, so direct matches like "What is DICGC?"
+ * always win regardless of the threshold.
+ */
+const FAQ_MATCH_THRESHOLD = 4;
+
+function matchFaq(userText) {
+  if (!userText || typeof userText !== 'string') return { faq: null, score: 0 };
+  const t = userText.toLowerCase();
+
+  // First: personal data — 'my fd' / 'my deposits' should route
+  // to the verify flow. Return a special 'flow' object that
+  // routes/bot.js will forward to the check_my_fds handler.
+  const personalTriggers = FAQ_TRIGGERS.check_my_fds || [];
+  let personalScore = 0;
+  for (const trig of personalTriggers) {
+    if (t.includes(trig)) personalScore += trig.length;
+  }
+  if (personalScore >= 4) {
+    return {
+      faq: null,
+      flow: {
+        id: 'check_my_fds',
+        label: 'Check my FDs',
+        text:
+          "To check your FDs anonymously, I need to verify you with three details. " +
+          "Please enter them in this exact format:\n\n" +
+          "1. Mobile number: 10 digits, no spaces (e.g. 9714503400)\n" +
+          "2. Date of birth: YYYY-MM-DD (e.g. 1990-01-15)\n" +
+          "3. PAN: AAAAA9999A (e.g. ABCDE1234F)",
+        followUps: ['verify_start'],
+      },
+      score: personalScore,
+    };
+  }
+
+  // Second: FAQ keyword triggers (curated FAQ answers).
+  let best = null;
+  let bestScore = 0;
+  for (const key of Object.keys(FAQ_TRIGGERS)) {
+    if (key === 'check_my_fds') continue; // handled above
+    let score = 0;
+    const faq = FAQ[key];
+    if (faq && faq.label) {
+      const label = faq.label.toLowerCase();
+      if (t.includes(label)) score += Math.floor(label.length * 1.5);
+    }
+    for (const trig of FAQ_TRIGGERS[key]) {
+      if (t.includes(trig)) score += trig.length;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = faq || null;
+    }
+  }
+  if (!best || bestScore < FAQ_MATCH_THRESHOLD) return { faq: null, score: bestScore };
+  return { faq: best, score: bestScore };
+}
+
+/**
  * Build the menu of clickable chips for a given role.
  *
  * For BOTH audiences, the menu includes:
@@ -272,4 +443,4 @@ function getMenu(audience) {
   return items;
 }
 
-module.exports = { FAQ, getFaq, getMenu, PERSONAL_INTENTS };
+module.exports = { FAQ, getFaq, getMenu, PERSONAL_INTENTS, FAQ_TRIGGERS, matchFaq };

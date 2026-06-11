@@ -136,6 +136,67 @@
   max-width: 100% !important;
 }
 
+/* markdown-rendered content inside bot messages */
+.fb-md-h1, .fb-md-h2, .fb-md-h3, .fb-md-h4, .fb-md-h5, .fb-md-h6 {
+  margin: 8px 0 4px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1f2937;
+}
+.fb-md-h1 { font-size: 18px; }
+.fb-md-h2 { font-size: 16px; }
+.fb-md-h3 { font-size: 15px; }
+.fb-md-h4, .fb-md-h5, .fb-md-h6 { font-size: 14px; }
+.fb-md-p { margin: 0 0 8px; }
+.fb-md-p:last-child { margin-bottom: 0; }
+.fb-md-ul, .fb-md-ol { margin: 4px 0 8px; padding-left: 22px; }
+.fb-md-ul li, .fb-md-ol li { margin: 2px 0; }
+.fb-md-code {
+  background: #f3f4f6;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  color: #b45309;
+}
+.fb-md-pre {
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.fb-md-pre code { color: inherit; background: transparent; padding: 0; }
+.fb-md-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 12.5px;
+}
+.fb-md-table th, .fb-md-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.fb-md-table th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.fb-md-hr { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
+.fb-md-quote {
+  border-left: 3px solid #d1d5db;
+  margin: 6px 0;
+  padding: 4px 10px;
+  color: #4b5563;
+  font-style: italic;
+  background: #f9fafb;
+  border-radius: 0 4px 4px 0;
+}
+
 .fb-typing { display: inline-flex; gap: 3px; padding: 4px 0; }
 .fb-typing span {
   width: 6px; height: 6px; border-radius: 50%; background: #9ca3af;
@@ -310,15 +371,29 @@
               + (isError ? 'fb-msg-error '
                 : (role === 'user' ? 'fb-msg-user ' : 'fb-msg-bot '))
               + (extraClass || '');
-    const wrap = el('div', { class: cls.trim() }, [text || '']);
+    // Bot messages are rendered as safe HTML (markdown -> HTML).
+    // User messages and error bubbles are rendered as plain text
+    // so the user can see exactly what they typed / what the error
+    // string is (no risk of a model injecting <script> in an
+    // error message either, since errors are server-side strings).
+    let node;
+    if (role === 'bot' && !isError) {
+      const html = formatBotText(text || '');
+      const div = document.createElement('div');
+      div.className = cls.trim();
+      div.innerHTML = html;
+      node = div;
+    } else {
+      node = el('div', { class: cls.trim() }, [text || '']);
+    }
     if (role === 'user') {
-      const w = el('div', { class: 'fb-msg-user-wrap' }, [wrap]);
+      const w = el('div', { class: 'fb-msg-user-wrap' }, [node]);
       bodyEl.appendChild(w);
     } else {
-      bodyEl.appendChild(wrap);
+      bodyEl.appendChild(node);
     }
     bodyEl.scrollTop = bodyEl.scrollHeight;
-    return wrap;
+    return node;
   }
 
   function appendChips(chips) {
@@ -608,7 +683,6 @@
         { intent: 'main_menu', label: '← Main menu' },
       ]);
     }
-
     // Build the follow-up chip row. On success, also include a
     // relevant FAQ fallback chip if the user's text had a
     // recognizable keyword. This way even when the LLM answers
@@ -679,6 +753,150 @@
     bodyEl.appendChild(t);
     bodyEl.scrollTop = bodyEl.scrollHeight;
     return t;
+  }
+
+  /* ---------- safe markdown renderer ----------
+   *
+   * Renders markdown to safe HTML. The LLM returns text that may
+   * contain:
+   *   ## headers, **bold**, *italic*, `code`, ```blocks```,
+   *   - lists, 1. lists, > quotes, | tables |, --- hr
+   *
+   * Security: every input byte is HTML-escaped FIRST. Then
+   * markdown rules run on the escaped text. This means a bot
+   * reply that says '<script>alert(1)</script>' is rendered
+   * as the literal 7 characters of escaped text, not as
+   * executable HTML. The renderer is ~80 lines of regex
+   * replacements; no external library, no innerHTML.
+   */
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatInline(s) {
+    // Apply to a single line (no newlines). The escaped string
+    // is mutated by these regexes; order matters.
+    return s
+      // inline code: `code` -> <code>code</code>
+      .replace(/`([^`]+)`/g, '<code class="fb-md-code">$1</code>')
+      // bold: **text** -> <strong>text</strong>
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      // italic: *text* or _text_ -> <em>text</em>
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/(^|\s)_([^_\n]+)_/g, '$1<em>$2</em>');
+  }
+
+  function formatBotText(text) {
+    if (typeof text !== 'string' || !text) return '';
+    // Split into lines, then process block-level constructs.
+    const lines = text.split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      // fenced code block: ```lang\n...\n```
+      if (/^```/.test(line)) {
+        const lang = line.replace(/^```/, '').trim();
+        const body = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) {
+          body.push(escapeHtml(lines[i]));
+          i++;
+        }
+        i++; // skip closing fence
+        const langAttr = lang ? ` data-lang="${escapeHtml(lang)}"` : '';
+        out.push(`<pre class="fb-md-pre"${langAttr}><code>${body.join('\n')}</code></pre>`);
+        continue;
+      }
+      // horizontal rule
+      if (/^---+\s*$/.test(line)) {
+        out.push('<hr class="fb-md-hr">');
+        i++; continue;
+      }
+      // header
+      const h = line.match(/^(#{1,6})\s+(.*)$/);
+      if (h) {
+        const level = h[1].length;
+        const inner = formatInline(escapeHtml(h[2]));
+        out.push(`<h${Math.min(level, 6)} class="fb-md-h${level}">${inner}</h${Math.min(level, 6)}>`);
+        i++; continue;
+      }
+      // markdown table: header row | --- | data rows
+      if (/\|/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1])) {
+        const headerCells = splitTableRow(line);
+        const sep = splitTableRow(lines[i + 1]);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && /\|/.test(lines[i]) && lines[i].trim() !== '') {
+          rows.push(splitTableRow(lines[i]));
+          i++;
+        }
+        const thead = '<thead><tr>' + headerCells.map(c => `<th>${formatInline(escapeHtml(c))}</th>`).join('') + '</tr></thead>';
+        const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${formatInline(escapeHtml(c))}</td>`).join('') + '</tr>').join('') + '</tbody>';
+        out.push(`<table class="fb-md-table">${thead}${tbody}</table>`);
+        continue;
+      }
+      // unordered list
+      if (/^\s*[-*]\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+          items.push(formatInline(escapeHtml(lines[i].replace(/^\s*[-*]\s+/, ''))));
+          i++;
+        }
+        out.push('<ul class="fb-md-ul">' + items.map(t => `<li>${t}</li>`).join('') + '</ul>');
+        continue;
+      }
+      // ordered list
+      if (/^\s*\d+\.\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          items.push(formatInline(escapeHtml(lines[i].replace(/^\s*\d+\.\s+/, ''))));
+          i++;
+        }
+        out.push('<ol class="fb-md-ol">' + items.map(t => `<li>${t}</li>`).join('') + '</ol>');
+        continue;
+      }
+      // blockquote
+      if (/^>\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^>\s+/.test(lines[i])) {
+          items.push(formatInline(escapeHtml(lines[i].replace(/^>\s+/, ''))));
+          i++;
+        }
+        out.push('<blockquote class="fb-md-quote">' + items.join('<br>') + '</blockquote>');
+        continue;
+      }
+      // empty line -> paragraph break
+      if (line.trim() === '') { i++; continue; }
+      // default: paragraph (collect consecutive non-special lines)
+      const paraLines = [];
+      while (
+        i < lines.length
+        && lines[i].trim() !== ''
+        && !/^(#{1,6}\s|```|-{3,}|\s*[-*]\s|\s*\d+\.\s|>\s|\|)/.test(lines[i])
+      ) {
+        paraLines.push(lines[i]);
+        i++;
+      }
+      if (paraLines.length) {
+        out.push('<p class="fb-md-p">' + formatInline(escapeHtml(paraLines.join(' '))) + '</p>');
+      }
+    }
+    return out.join('');
+  }
+
+  function splitTableRow(line) {
+    // strip leading/trailing pipes, split on |, trim each cell
+    return line
+      .replace(/^\s*\|/, '')
+      .replace(/\|\s*$/, '')
+      .split('|')
+      .map(s => s.trim());
   }
 
   /* ---------- open / close ---------- */
