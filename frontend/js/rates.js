@@ -93,7 +93,7 @@ async function loadRates() {
                 <span class="chip">${rate.bank_code}</span>
                 <span class="chip">DICGC${rate.dicgc_insured ? ' Insured' : ' N/A'}</span>
               </div>
-              <button class="btn btn-sm" onclick="bookFd(${rate.rate_id})">Invest now</button>
+              <button class="btn btn-sm" onclick="bookFd('${rate.rate_id}')">Invest now</button>
             </div>
           </div>
         `;
