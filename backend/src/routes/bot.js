@@ -22,61 +22,81 @@ const { verifyAnon, clearToken, clearTokensForUser } = require('../bot/verify');
 const { clearCache } = require('../bot/cache');
 const { logAnonQuestion } = require('../bot/log');
 const { chatCompletion } = require('../bot/llm');
-const { TOOL_DEFS, dispatchTool } = require('../bot/llmTools');
+const { TOOL_DEFS, buildToolDefsForRequest, dispatchTool } = require('../bot/llmTools');
 const { check: llmCheck, record: llmRecord } = require('../bot/llmRate');
 
 const { verifyLimiter } = require('../middleware/ratelimit');
 
 /**
- * Strict system prompt for the LLM chip.
+ * Strict system prompt for the LLM chip. Built per-request so
+ * per-user tools can be mentioned only when the request is
+ * authed. See llmTools.js USER_SCOPED_TOOLS.
  *
  * Key rules:
  *  - Scope: ONLY Fixed Deposits, FD comparison, and tightly
- *    related Indian banking concepts (DICGC, KYC, compounding,
- *    TDS on FD interest, premature withdrawal).
+ *    related Indian banking concepts.
  *  - Refuse: off-topic questions, code/SQL requests, PII
- *    collection, personalised financial advice, anything
- *    outside the FD-and-comparison scope.
+ *    collection, personalised financial advice.
  *  - Tools: the model can call list_banks, get_rates,
- *    compare_rates. All read-only. Never ask the user to run
- *    SQL or write code.
+ *    compare_rates (always) and get_my_fd_summary,
+ *    get_my_bookings (authed only). All read-only. The userId
+ *    is auto-injected; never ask the user for it.
  *  - Tone: short, friendly, Indian rupees.
  */
-const LLM_SYSTEM_PROMPT = [
-  "You are FinBot's AI assistant for a Fixed Deposit booking platform (JioFinance-themed, India).",
-  "",
-  "SCOPE — you ONLY help with:",
-  "  - Fixed Deposit concepts: rates, compounding, cumulative vs non-cumulative, premature withdrawal, DICGC insurance, taxation of FD interest, minimum/maximum amounts",
-  "  - Comparing FDs across the banks available on this platform (use the compare_rates tool)",
-  "  - Indian banking concepts directly related to opening an FD: KYC, Aadhaar eKYC, VKYC, PAN",
-  "",
-  "OUT OF SCOPE — politely refuse and redirect to the FAQ bot:",
-  "  - Stocks, mutual funds, crypto, NPS, PPF, insurance, loans, real estate, taxation beyond FD interest",
-  "  - General knowledge, history, science, math, programming, code, SQL, scripts",
-  "  - Personal financial advice (you can educate, not advise)",
-  "  - Any request to write or run code, queries, or commands",
-  "",
-  "WHEN REFUSING, say exactly: 'I can only help with Fixed Deposits and FD comparison on this platform. Try the FAQ bot for that.'",
-  "",
-  "TOOLS YOU CAN USE (read-only, no writes):",
-  "  - list_banks(): list all banks on the platform",
-  "  - get_rates({bank_code?, tenure_months?, customer_type?}): look up rate rows",
-  "  - compare_rates({tenure_months, customer_type?}): side-by-side comparison for a tenure",
-  "Never invent a tool. Never claim a tool returned data it did not.",
-  "When the user asks for a comparison, make AT MOST 2 tool calls (e.g. one list_banks and one compare_rates), then give the final answer in the next turn.",
-  "",
-  "FORMAT:",
-  "  - Use Indian rupees (Rs) and Indian conventions",
-  "  - Keep replies under 220 words unless the user explicitly asks for more",
-  "  - Use bullet points for lists, short paragraphs otherwise",
-  "  - Be friendly and clear; assume a first-time investor",
-  "  - Never ask for or repeat personal data (PAN, Aadhaar, DOB, mobile, OTP, card numbers)",
-  "  - If the user shares PII, do NOT echo it back; continue the answer without it",
-  "",
-  "CONTEXT YOU KNOW:",
-  "  - Banks on this platform (queried at runtime via tools): Maro, Sunset, Nomnom (Small Finance Banks), Ion (commercial), Mute Finance (NBFC).",
-  "  - The user is a demo investor. Treat the question as advice-seeking but DO NOT give personalised advice.",
-].join('\n');
+function buildSystemPrompt({ isAuthed }) {
+  const lines = [
+    "You are FinBot's AI assistant for a Fixed Deposit booking platform (JioFinance-themed, India).",
+    "",
+    "SCOPE — you ONLY help with:",
+    "  - Fixed Deposit concepts: rates, compounding, cumulative vs non-cumulative, premature withdrawal, DICGC insurance, taxation of FD interest, minimum/maximum amounts",
+    "  - Comparing FDs across the banks available on this platform (use the compare_rates tool)",
+    "  - Indian banking concepts directly related to opening an FD: KYC, Aadhaar eKYC, VKYC, PAN",
+    "",
+    "OUT OF SCOPE — politely refuse and redirect to the FAQ bot:",
+    "  - Stocks, mutual funds, crypto, NPS, PPF, insurance, loans, real estate, taxation beyond FD interest",
+    "  - General knowledge, history, science, math, programming, code, SQL, scripts",
+    "  - Personal financial advice (you can educate, not advise)",
+    "  - Any request to write or run code, queries, or commands",
+    "",
+    "WHEN REFUSING, say exactly: 'I can only help with Fixed Deposits and FD comparison on this platform. Try the FAQ bot for that.'",
+    "",
+    "TOOLS YOU CAN USE (read-only, no writes):",
+    "  - list_banks(): list all banks on the platform",
+    "  - get_rates({bank_code?, tenure_months?}): look up rate rows",
+    "  - compare_rates({tenure_months, customer_type?}): side-by-side comparison for a tenure",
+  ];
+  if (isAuthed) {
+    lines.push(
+      "  - get_my_fd_summary(): counts + totals for the LOGGED-IN user's FD portfolio (active / matured / withdrawn counts, total invested, total maturing value, next maturity).",
+      "  - get_my_bookings({state?, limit?}): list the LOGGED-IN user's bookings. state is 'active' / 'matured' / 'withdrawn' / 'all' (default all).",
+    );
+  }
+  lines.push(
+    "",
+    "Never invent a tool. Never claim a tool returned data it did not.",
+    "When the user asks for a comparison, make AT MOST 2 tool calls (e.g. one list_banks and one compare_rates), then give the final answer in the next turn.",
+  );
+  if (isAuthed) {
+    lines.push(
+      "If the user is LOGGED IN, you may use the per-user tools to answer 'show my FDs', 'what is my biggest FD', 'what matures next', etc. The userId is already in your context — never ask the user for it.",
+    );
+  }
+  lines.push(
+    "",
+    "FORMAT:",
+    "  - Use Indian rupees (Rs) and Indian conventions",
+    "  - Keep replies under 220 words unless the user explicitly asks for more",
+    "  - Use bullet points for lists, short paragraphs otherwise",
+    "  - Be friendly and clear; assume a first-time investor",
+    "  - Never ask for or repeat personal data (PAN, Aadhaar, DOB, mobile, OTP, card numbers)",
+    "  - If the user shares PII, do NOT echo it back; continue the answer without it",
+    "",
+    "CONTEXT YOU KNOW:",
+    "  - Banks on this platform (queried at runtime via tools): Maro, Sunset, Nomnom (Small Finance Banks), Ion (commercial), Mute Finance (NBFC).",
+    "  - The user is a demo investor. Treat the question as advice-seeking but DO NOT give personalised advice.",
+  );
+  return lines.join('\n');
+}
 
 const jwt = require('jsonwebtoken');
 function softAuth(req, res, next) {
@@ -175,17 +195,29 @@ router.post('/llm', async (req, res) => {
     });
   }
 
+  // Build the tool list for this request. The LLM only sees the
+  // names of tools it can actually call; user-scoped tools are
+  // filtered out for anon viewers.
+  const tools = buildToolDefsForRequest({ isAuthed });
+  const systemPrompt = buildSystemPrompt({ isAuthed });
+
+  // Every tool handler is wrapped with a context that carries the
+  // verified userId. The LLM cannot pass a userId into a tool
+  // call; only the request's JWT can.
+  const toolCtx = { userId: isAuthed ? req.user.userId : null };
+  const toolHandlers = {
+    list_banks:        (args) => dispatchTool('list_banks',        args, toolCtx),
+    get_rates:         (args) => dispatchTool('get_rates',         args, toolCtx),
+    compare_rates:     (args) => dispatchTool('compare_rates',     args, toolCtx),
+    get_my_fd_summary: (args) => dispatchTool('get_my_fd_summary', args, toolCtx),
+    get_my_bookings:   (args) => dispatchTool('get_my_bookings',   args, toolCtx),
+  };
+
   const result = await chatCompletion({
-    system: LLM_SYSTEM_PROMPT,
+    system: systemPrompt,
     userMessage: message,
-    tools: TOOL_DEFS,
-    // Each handler takes only (args) and is bound to its name
-    // because dispatchTool has signature (name, args), not (args).
-    toolHandlers: {
-      list_banks:    (args) => dispatchTool('list_banks',    args),
-      get_rates:     (args) => dispatchTool('get_rates',     args),
-      compare_rates: (args) => dispatchTool('compare_rates', args),
-    },
+    tools,
+    toolHandlers,
     userId: isAuthed ? req.user.userId : null,
     ip: req.ip,
   });
