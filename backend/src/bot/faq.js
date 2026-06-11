@@ -243,32 +243,32 @@ function getFaq(intent) {
 /**
  * Build the menu of clickable chips for a given role.
  *
- *   audience = 'all'  -> every FAQ chip + 'Check my FDs' trigger
- *                          (anon: triggers the verify flow)
- *   audience = 'auth' -> 'How do I book an FD?' chip + the four
- *                          personalized 'my FDs' actions
+ * For BOTH audiences, the menu includes:
+ *   - all hardcoded FAQ chips (so a logged-in user can still ask
+ *     'What is DICGC?' without losing access)
+ *   - the 'Talk to assistant' chip (LLM mode)
+ *
+ * For 'all' (anon) only:
+ *   - the 'Check my FDs' verify trigger
+ *
+ * For 'auth' (logged in) only:
+ *   - the four personalized 'my FDs' actions, listed first so
+ *     they are visible at the top of the panel
  */
 function getMenu(audience) {
   const items = [];
-  if (audience === 'all') {
-    for (const key of Object.keys(FAQ)) {
-      items.push({ intent: FAQ[key].intent, label: FAQ[key].label });
-    }
-    items.push({ intent: 'check_my_fds', label: 'Check my FDs (verify identity)' });
-  } else {
-    // authed: keep the booking FAQ + the personalized actions
-    items.push({ intent: FAQ.how_to_book.intent, label: FAQ.how_to_book.label });
+  if (audience === 'auth') {
     for (const intent of ['my_active_fds', 'my_total_value', 'my_maturity', 'my_biggest_fd']) {
       items.push({ intent, label: PERSONAL_INTENTS[intent] });
     }
   }
-  // 'Talk to assistant' is offered to BOTH audiences. For anon
-  // users it sits alongside the verify trigger at the bottom of
-  // the menu; for authed users it sits above the personalized
-  // actions. The widget intercepts this intent client-side and
-  // enters free-form Q&A mode (it never hits /api/bot/ask).
-  const taIdx = items.length; // insert just before [Main menu] if any
-  items.splice(taIdx, 0, { intent: 'talk_to_assistant', label: PERSONAL_INTENTS.talk_to_assistant });
+  for (const key of Object.keys(FAQ)) {
+    items.push({ intent: FAQ[key].intent, label: FAQ[key].label });
+  }
+  items.push({ intent: 'talk_to_assistant', label: PERSONAL_INTENTS.talk_to_assistant });
+  if (audience === 'all') {
+    items.push({ intent: 'check_my_fds', label: 'Check my FDs (verify identity)' });
+  }
   return items;
 }
 
